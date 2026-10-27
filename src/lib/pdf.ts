@@ -44,7 +44,18 @@ interface Fonts {
 let fontCache: Promise<Record<string, Uint8Array>> | null = null;
 function loadFontFiles() {
   fontCache ??= (async () => {
-    const dir = path.join(process.cwd(), "assets", "fonts");
+    // The working directory differs between hosts (Vercel, Netlify, local), so look in each.
+    const candidates = [process.cwd(), process.env.LAMBDA_TASK_ROOT, path.join(process.cwd(), ".next", "standalone")]
+      .filter((d): d is string => !!d)
+      .map((d) => path.join(d, "assets", "fonts"));
+    let dir = candidates[0];
+    for (const c of candidates) {
+      try {
+        await fs.access(path.join(c, "LiberationSerif-Regular.ttf"));
+        dir = c;
+        break;
+      } catch {}
+    }
     const names = ["LiberationSerif-Regular", "LiberationSerif-Bold", "LiberationSerif-Italic", "LiberationSans-Regular", "LiberationSans-Bold"];
     const entries = await Promise.all(names.map(async (n) => [n, new Uint8Array(await fs.readFile(path.join(dir, `${n}.ttf`)))] as const));
     return Object.fromEntries(entries);

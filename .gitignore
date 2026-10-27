@@ -43,3 +43,6 @@ next-env.d.ts
 
 # local demo-mode data (simulated contracts, PDFs, generated secrets)
 /.data/
+
+# netlify local build output
+/.netlify/

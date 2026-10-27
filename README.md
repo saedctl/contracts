@@ -19,7 +19,7 @@ A small, purpose-built contract tool for **The Engineers Club** (operated by Har
 | E-signatures | Dropbox Sign API v3 (embedded signing, verified webhooks) |
 | Email | Resend |
 | PDF generation | pdf-lib with embedded Liberation fonts (SIL OFL) |
-| Hosting | Vercel (daily maintenance job via Vercel Cron) |
+| Hosting | Vercel (Vercel Cron) or Netlify (scheduled function) for the daily maintenance job |
 
 ## Demo mode: try it in two minutes
 
@@ -85,6 +85,13 @@ Generate three random values with `openssl rand -base64 48` and set `SESSION_SEC
 4. Add your custom domain. It must match the Dropbox Sign API app domain, and Vercel serves it over HTTPS.
 
 Until every required integration is configured (and `DEMO_MODE` is not set), the dashboard shows **"Setup incomplete"** and refuses to send contracts. Nothing is ever simulated in production.
+
+### 5b. Or deploy to Netlify instead
+
+1. In Netlify, go to **Add new site → Import an existing project → GitHub** and choose `saedctl/contracts`. The build settings come from `netlify.toml`, so leave them as they are.
+2. Under **Site configuration → Environment variables**, add every variable from `.env.example`. Set `APP_URL` to your Netlify address, e.g. `https://your-site.netlify.app` or your custom domain.
+3. Deploy. The daily maintenance job is `netlify/functions/maintenance.mts`, a Netlify scheduled function that calls `/api/cron/maintenance` with `CRON_SECRET`. You can check its runs under **Logs → Functions → maintenance**.
+4. Use the Netlify address (or your custom domain) as the Dropbox Sign API app **domain**. The **callback URL** is `https://<your-site>/api/webhooks/dropbox-sign`.
 
 ### 6. Upload the master contract template
 

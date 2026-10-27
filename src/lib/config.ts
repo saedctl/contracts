@@ -10,6 +10,11 @@ function appUrl(): string {
   if (explicit) return explicit.replace(/\/$/, "");
   if (env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`;
   if (env.VERCEL_URL) return `https://${env.VERCEL_URL}`;
+  // Netlify: URL is the site's main address; DEPLOY_PRIME_URL is the branch/preview address.
+  if (env.NETLIFY || env.URL) {
+    const url = env.CONTEXT && env.CONTEXT !== "production" ? env.DEPLOY_PRIME_URL || env.URL : env.URL;
+    if (url) return url.replace(/\/$/, "");
+  }
   return "http://localhost:3000";
 }
 
@@ -51,7 +56,8 @@ export const config = {
   retentionYears: Number(env.RETENTION_YEARS || 7),
   draftRetentionDays: Number(env.DRAFT_RETENTION_DAYS || 90),
   cronSecret: env.CRON_SECRET || null,
-  demoDataDir: env.DEMO_DATA_DIR || (env.VERCEL ? "/tmp/tec-demo" : path.join(process.cwd(), ".data")),
+  // Serverless hosts only allow writes to /tmp.
+  demoDataDir: env.DEMO_DATA_DIR || (env.VERCEL || env.NETLIFY || env.AWS_LAMBDA_FUNCTION_NAME ? "/tmp/tec-demo" : path.join(process.cwd(), ".data")),
 };
 
 export type IntegrationStatus = { name: string; configured: boolean; simulated: boolean; missing: string[] };
