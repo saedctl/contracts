@@ -50,6 +50,14 @@ export interface TemplateCheck {
   used: string[];
   unknown: string[];
   missingRecommended: string[];
+  /** Fill-in markers such as "[ADD: company number]" left in a draft. */
+  unfilled: string[];
+}
+
+const UNFILLED_RE = /\[\s*(?:ADD|TODO|TBC|INSERT)\b[^\]]*\]/gi;
+
+export function findUnfilled(body: string): string[] {
+  return [...new Set(body.match(UNFILLED_RE) ?? [])];
 }
 
 export function checkTemplate(body: string): TemplateCheck {
@@ -57,6 +65,7 @@ export function checkTemplate(body: string): TemplateCheck {
   return {
     used,
     unknown: used.filter((k) => !KNOWN.has(k)),
+    unfilled: findUnfilled(body),
     missingRecommended: ["customer_name", "membership_start_date", "membership_end_date", "amount_paid"].filter(
       (k) => !used.includes(k),
     ),

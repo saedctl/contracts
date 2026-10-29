@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth/session";
 import { listContractsForStaff } from "@/lib/services/contracts";
 import { productionBlockers } from "@/lib/config";
+import { findUnfilled } from "@/lib/template";
 import { getStore } from "@/lib/db";
 import { CONTRACT_STATUSES, type ContractStatus } from "@/lib/types";
 import { formatMoney, formatDateTime } from "@/lib/utils";
@@ -55,6 +56,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Alert tone="warning">
           No master contract template has been set up.{" "}
           {isAdmin ? <Link href="/admin/template" className="font-medium underline">Upload your agreement</Link> : "Ask an administrator to upload it."}
+        </Alert>
+      )}
+      {template && findUnfilled(template.body).length > 0 && (
+        <Alert tone="error">
+          The active contract template still contains unfilled items ({findUnfilled(template.body).join(", ")}), so new contracts are blocked.{" "}
+          {isAdmin ? <Link href="/admin/template" className="font-medium underline">Fix the template</Link> : "Ask an administrator to fix the template."}
         </Alert>
       )}
       {template?.isSample && isAdmin && (

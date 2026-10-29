@@ -99,6 +99,9 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
         {check.unknown.length > 0 && (
           <Alert tone="error" className="mt-5">Unknown placeholder{check.unknown.length > 1 ? "s" : ""}: {check.unknown.map((k) => `{{${k}}}`).join(", ")}. Use only the placeholders listed on the right.</Alert>
         )}
+        {check.unfilled.length > 0 && (
+          <Alert tone="error" className="mt-5">Fill in these items before saving — they would appear in customers&apos; contracts as written: {check.unfilled.join(", ")}</Alert>
+        )}
         {body.trim() && check.missingRecommended.length > 0 && check.unknown.length === 0 && (
           <Alert tone="warning" className="mt-5">Not used yet: {check.missingRecommended.map((k) => `{{${k}}}`).join(", ")}. Saving is still allowed.</Alert>
         )}
@@ -107,7 +110,7 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
 
         <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[13px] text-muted">{activeVersion ? `Currently active: v${activeVersion}. ` : ""}Saving creates v{(activeVersion ?? 0) + 1} and makes it active.</p>
-          <Button type="submit" disabled={pending || !body.trim() || check.unknown.length > 0}>{pending && <Spinner />} Save new version</Button>
+          <Button type="submit" disabled={pending || !body.trim() || check.unknown.length > 0 || check.unfilled.length > 0}>{pending && <Spinner />} Save new version</Button>
         </div>
       </Card>
 

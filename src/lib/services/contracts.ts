@@ -1,7 +1,7 @@
 import "server-only";
 import { config, productionBlockers } from "../config";
 import { getStore } from "../db";
-import { renderTemplate } from "../template";
+import { findUnfilled, renderTemplate } from "../template";
 import { applyDemoSignature, generateContractPdf, type ContractLayout, type DemoSignature } from "../pdf";
 import { signingUrl, parseSigningToken, verifySigningMac } from "../signing-link";
 import * as ds from "../esign/dropbox-sign";
@@ -57,6 +57,10 @@ async function requireTemplate(): Promise<TemplateVersion> {
   const t = await (await getStore()).getActiveTemplate();
   if (!t) throw new UserFacingError("No contract template has been set up yet. An administrator needs to upload the master template first.");
   if (t.isSample && !config.demoMode) throw new UserFacingError("The sample template cannot be used for real contracts. Upload your approved agreement first.");
+  const unfilled = findUnfilled(t.body);
+  if (unfilled.length) {
+    throw new UserFacingError(`The contract template still contains ${unfilled.join(", ")}. An administrator needs to fill these in on the Template page and save a new version.`);
+  }
   return t;
 }
 
