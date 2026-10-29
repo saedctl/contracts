@@ -24,6 +24,9 @@ export async function createTemplateVersion(
   if (check.unknown.length) {
     throw new UserFacingError(`Unknown placeholder${check.unknown.length > 1 ? "s" : ""}: ${check.unknown.map((k) => `{{${k}}}`).join(", ")}. Use only the approved placeholders.`);
   }
+  if (check.unfilled.length) {
+    throw new UserFacingError(`Fill in these items before saving: ${check.unfilled.join(", ")}.`);
+  }
   const store = await getStore();
   const bodySha256 = sha256Hex(body);
   const t = await store.createTemplateVersion({ title, body, notes: input.notes.trim() || null, createdBy: admin.id, bodySha256 });
