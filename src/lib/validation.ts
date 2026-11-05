@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CURRENCIES, PAYMENT_STATUSES } from "./types";
+import { CURRENCIES, MEMBERSHIP_TIERS, PAYMENT_STATUSES } from "./types";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date");
 
@@ -18,6 +18,7 @@ export const contractInputSchema = z
       .string()
       .trim()
       .regex(/^\+?[\d\s().-]{7,24}$/, "Enter a valid phone number, e.g. +44 7700 900123"),
+    membershipTier: z.enum(MEMBERSHIP_TIERS, { message: "Choose a membership tier" }),
     duration: z.enum(["1", "3", "6", "12", "custom"], { message: "Choose a membership duration" }),
     startDate: isoDate,
     endDate: isoDate,

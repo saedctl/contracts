@@ -1,6 +1,7 @@
 export const BRAND = {
   name: "The Engineers Club",
-  legalName: "Harbor Security Ltd",
+  // Legal entity named in contracts and emails. Override with COMPANY_LEGAL_NAME (server-side).
+  legalName: (typeof process !== "undefined" && process.env.COMPANY_LEGAL_NAME) || "Harbor Security Ltd",
   website: "https://theengineers.club",
   websiteLabel: "theengineers.club",
   productName: "Contract Dashboard",

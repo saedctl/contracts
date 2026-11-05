@@ -2,13 +2,21 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 import { saveTemplateAction, type ActionResult } from "@/app/actions/admin";
-import { checkTemplate, PLACEHOLDERS, renderTemplate } from "@/lib/template";
+import { BLOCK_PLACEHOLDERS, checkTemplate, PLACEHOLDERS } from "@/lib/template";
+import { buildContractDoc } from "@/lib/document";
 import { Alert, Button, Card, Field, Spinner, cx } from "@/components/ui";
-import { ContractDocument } from "@/components/ContractDocument";
+import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 
-const EXAMPLES = Object.fromEntries(PLACEHOLDERS.map((p) => [p.key, p.example]));
+const EXAMPLES: Record<string, string> = Object.fromEntries(PLACEHOLDERS.map((p) => [p.key, p.example]));
 
-export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampleBody }: { initialTitle: string; initialBody: string; activeVersion: number | null; sampleBody: string | null }) {
+export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampleBody, companySignatory, legalName }: {
+  initialTitle: string;
+  initialBody: string;
+  activeVersion: number | null;
+  sampleBody: string | null;
+  companySignatory: { name: string; role: string; image: string | null } | null;
+  legalName: string;
+}) {
   const [state, action, pending] = useActionState<ActionResult, FormData>(saveTemplateAction, {});
   const [body, setBody] = useState(initialBody);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
@@ -16,7 +24,14 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
   const [importMsg, setImportMsg] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const check = useMemo(() => checkTemplate(body), [body]);
-  const blocks = useMemo(() => (tab === "preview" ? renderTemplate(body, EXAMPLES) : []), [tab, body]);
+  const doc = useMemo(() => {
+    if (tab !== "preview") return null;
+    const values: Record<string, string> = { ...EXAMPLES, company_name: legalName };
+    return buildContractDoc(body, values, {
+      client: { name: values.customer_name, status: "pending" },
+      company: companySignatory ? { name: companySignatory.name, role: companySignatory.role, appliedOn: values.contract_date, image: companySignatory.image ?? undefined } : null,
+    });
+  }, [tab, body, companySignatory, legalName]);
 
   function insert(key: string) {
     const el = area.current;
@@ -87,8 +102,8 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
           placeholder={"# Membership Agreement\n\nThis agreement is between {{company_name}} and {{customer_name}}…"}
         />
         {tab === "preview" && (
-          <div className="mt-3 max-h-[640px] overflow-y-auto rounded-xl border border-line bg-white px-5 py-8 sm:px-10">
-            {body.trim() ? <ContractDocument blocks={blocks} highlight /> : <p className="text-muted">Nothing to preview yet.</p>}
+          <div className="mt-3 max-h-[720px] overflow-y-auto rounded-xl">
+            {body.trim() && doc ? <PaperSheet><ContractDocument doc={doc} highlight /></PaperSheet> : <p className="p-6 text-muted">Nothing to preview yet.</p>}
           </div>
         )}
 
@@ -99,6 +114,9 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
         {check.unknown.length > 0 && (
           <Alert tone="error" className="mt-5">Unknown placeholder{check.unknown.length > 1 ? "s" : ""}: {check.unknown.map((k) => `{{${k}}}`).join(", ")}. Use only the placeholders listed on the right.</Alert>
         )}
+        {check.unfilled.length > 0 && (
+          <Alert tone="error" className="mt-5">Fill in these items before saving — they would appear in customers&apos; contracts as written: {check.unfilled.join(", ")}</Alert>
+        )}
         {body.trim() && check.missingRecommended.length > 0 && check.unknown.length === 0 && (
           <Alert tone="warning" className="mt-5">Not used yet: {check.missingRecommended.map((k) => `{{${k}}}`).join(", ")}. Saving is still allowed.</Alert>
         )}
@@ -107,7 +125,7 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
 
         <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[13px] text-muted">{activeVersion ? `Currently active: v${activeVersion}. ` : ""}Saving creates v{(activeVersion ?? 0) + 1} and makes it active.</p>
-          <Button type="submit" disabled={pending || !body.trim() || check.unknown.length > 0}>{pending && <Spinner />} Save new version</Button>
+          <Button type="submit" disabled={pending || !body.trim() || check.unknown.length > 0 || check.unfilled.length > 0}>{pending && <Spinner />} Save new version</Button>
         </div>
       </Card>
 
@@ -126,6 +144,20 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
             ))}
           </ul>
         </Card>
+        <Card className="p-5">
+          <h3 className="font-serif text-base font-semibold">Sections</h3>
+          <p className="mt-1 text-[13px] text-muted">Added automatically (provider/client and details at the top, signatures at the end). Insert one on its own line to place it yourself.</p>
+          <ul className="mt-3 space-y-1">
+            {BLOCK_PLACEHOLDERS.map((p) => (
+              <li key={p.key}>
+                <button type="button" onClick={() => insert(p.key)} className={cx("w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-paper", check.used.includes(p.key) && "bg-bronze-wash")}>
+                  <code className="block font-mono text-[12px] text-bronze-dark">{`{{${p.key}}}`}</code>
+                  <span className="text-[12.5px] text-muted">{p.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
         <Card className="p-5 text-[13px] leading-6 text-muted">
           <h3 className="font-serif text-base font-semibold text-ink">Formatting</h3>
           <ul className="mt-2 space-y-0.5 font-mono text-[12px]">
@@ -133,9 +165,11 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
             <li>## Sub-heading</li>
             <li>**bold** · *italic*</li>
             <li>- bullet point</li>
+            <li>✓ tick-mark item</li>
+            <li>&gt; highlighted box</li>
             <li>--- divider</li>
           </ul>
-          <p className="mt-2">Leave a blank line between paragraphs.</p>
+          <p className="mt-2">Leave a blank line between paragraphs. The first <code>#</code> heading is the document title; an <code>*italic*</code> line right below it becomes the tagline.</p>
         </Card>
       </aside>
     </form>

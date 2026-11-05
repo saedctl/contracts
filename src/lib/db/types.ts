@@ -43,6 +43,10 @@ export interface Store {
   addEmailLog(e: Omit<EmailLogEntry, "id" | "createdAt">): Promise<void>;
   listEmailLog(filter: { contractId?: string; limit?: number }): Promise<EmailLogEntry[]>;
 
+  // App settings (small JSON values, e.g. the company signature)
+  getSetting<T>(key: string): Promise<T | null>;
+  setSetting(key: string, value: unknown): Promise<void>;
+
   /** Records a webhook delivery; returns false if it was already processed (idempotency). */
   claimWebhookEvent(key: string, provider: string, eventType: string, payload: unknown): Promise<boolean>;
 

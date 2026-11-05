@@ -46,6 +46,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "provider.error": "E-signature provider error",
   "template.version_created": "Template version created",
   "template.version_activated": "Template version activated",
+  "settings.company_signature_updated": "Company signature updated",
   "staff.signed_in": "Signed in",
   "staff.created": "Staff account created",
   "staff.updated": "Staff account updated",

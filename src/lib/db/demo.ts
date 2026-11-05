@@ -18,6 +18,7 @@ interface DemoData {
   emails: EmailLogEntry[];
   webhooks: string[];
   refSeq: number;
+  settings?: Record<string, unknown>;
 }
 
 const empty = (): DemoData => ({ version: 1, staff: [], templates: [], contracts: [], audit: [], emails: [], webhooks: [], refSeq: 0 });
@@ -249,6 +250,14 @@ export class DemoStore implements Store {
       .filter((e) => !filter.contractId || e.contractId === filter.contractId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, filter.limit ?? 200);
+  }
+  async getSetting<T>(key: string) {
+    return ((await this.load()).settings?.[key] as T | undefined) ?? null;
+  }
+  async setSetting(key: string, value: unknown) {
+    await this.mutate((d) => {
+      d.settings = { ...(d.settings ?? {}), [key]: value };
+    });
   }
   async claimWebhookEvent(key: string) {
     return this.mutate((d) => {

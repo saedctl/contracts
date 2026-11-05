@@ -16,6 +16,10 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   payment_plan: "Payment Plan",
 };
 
+export const MEMBERSHIP_TIERS = ["premium", "vip"] as const;
+export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
+export const MEMBERSHIP_TIER_LABELS: Record<MembershipTier, string> = { premium: "Premium", vip: "VIP" };
+
 export type EsignProvider = "dropbox_sign" | "demo";
 
 export interface StaffUser {

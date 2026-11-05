@@ -1,7 +1,7 @@
 import "server-only";
 import { BRAND } from "../brand";
 import { describeTerm } from "../dates";
-import { PAYMENT_STATUS_LABELS, type FieldValues } from "../types";
+import { MEMBERSHIP_TIER_LABELS, PAYMENT_STATUS_LABELS, type FieldValues } from "../types";
 import { formatLongDate, formatMoney, todayISO } from "../utils";
 import type { ContractInput } from "../validation";
 
@@ -18,6 +18,7 @@ export function buildFieldValues(input: ContractInput, reference: string, issued
     membership_start_date: formatLongDate(input.startDate),
     membership_end_date: formatLongDate(input.endDate),
     membership_duration: duration,
+    membership_tier: MEMBERSHIP_TIER_LABELS[input.membershipTier],
     amount_paid: formatMoney(input.amountPaid, input.currency),
     currency: input.currency,
     payment_status: PAYMENT_STATUS_LABELS[input.paymentStatus],

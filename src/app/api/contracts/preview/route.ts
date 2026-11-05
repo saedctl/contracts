@@ -8,6 +8,6 @@ export const POST = staffRoute(async (req) => {
   if (new URL(req.url).searchParams.get("format") === "pdf") {
     return pdfResponse(await previewPdf(input), "Preview - Membership Agreement.pdf");
   }
-  const { template, blocks } = await previewContract(input);
-  return json({ blocks, templateVersion: template.version, templateTitle: template.title, isSample: template.isSample });
+  const { template, doc } = await previewContract(input);
+  return json({ doc, templateVersion: template.version, templateTitle: template.title, isSample: template.isSample });
 });

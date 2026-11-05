@@ -39,10 +39,13 @@ export async function seedDemo(store: DemoStore) {
     createdBy: admin.id, bodySha256: sha256Hex(SAMPLE_TEMPLATE_BODY), isSample: true,
   });
   await store.activateTemplateVersion(t.id);
+  await store.setSetting("company_signature", {
+    enabled: true, name: "Saed Farah", role: "For The Engineers Club", imagePath: null, imageType: null, updatedAt: new Date().toISOString(),
+  });
 
   const start = todayISO();
   const make = (name: string, email: string, amount: number, months: 3 | 6 | 12): ContractInput => ({
-    customerName: name, customerEmail: email, customerPhone: "+44 7700 900000", duration: String(months) as "3",
+    customerName: name, customerEmail: email, customerPhone: "+44 7700 900000", membershipTier: months === 12 ? "vip" : "premium", duration: String(months) as "3",
     startDate: start, endDate: calculateEndDate(start, months), amountPaid: amount, currency: "GBP",
     paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0,
   });

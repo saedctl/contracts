@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
-import { resolveSigningToken, getContractTemplateBody, CONSENT_STATEMENT } from "@/lib/services/contracts";
-import { renderTemplate } from "@/lib/template";
-import { PAYMENT_STATUS_LABELS } from "@/lib/types";
-import { formatLongDate, formatMoney } from "@/lib/utils";
+import { resolveSigningToken, CONSENT_STATEMENT } from "@/lib/services/contracts";
+import { contractDoc } from "@/lib/services/document";
+import type { Contract } from "@/lib/types";
+import { formatLongDate } from "@/lib/utils";
 import { Card } from "@/components/ui";
-import { ContractDocument } from "@/components/ContractDocument";
+import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 import { SigningPanel } from "@/components/sign/SigningPanel";
 import { AutoRefresh } from "@/components/sign/AutoRefresh";
+import { PrintButton } from "@/components/sign/PrintButton";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your membership agreement", robots: { index: false, follow: false } };
@@ -15,44 +16,37 @@ export const metadata: Metadata = { title: "Your membership agreement", robots: 
 export default async function SignPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const s = await resolveSigningToken(token);
+  const contract = s.state === "invalid" ? null : s.contract;
+  const tier = contract?.fieldValues.membership_tier;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="border-b border-line bg-white/60">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <a href={BRAND.website} className="font-serif text-[12px] font-medium uppercase tracking-[0.3em] text-bronze">{BRAND.name}</a>
-          <span className="text-[13px] text-muted">Membership agreement</span>
+      <header className="no-print border-b border-line bg-white">
+        <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <a href={BRAND.website} className="flex items-center gap-3">
+            <span className="font-serif text-[18px] font-semibold sm:text-[20px]">{BRAND.name}</span>
+            {tier && <span className="rounded-full bg-bronze px-3 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-white">{tier}</span>}
+          </a>
+          <span className="hidden text-[14px] text-muted sm:block">Membership Agreement</span>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">
+
+      <main className="mx-auto w-full max-w-[1060px] flex-1 px-3 py-6 sm:px-6 sm:py-8">
         {s.state === "invalid" && (
           <Message title="This link isn't valid">
             The signing link may have been replaced by a newer one, or copied incorrectly. Please use the most recent email from {BRAND.name}, or reply to it and we&apos;ll send a new link.
           </Message>
         )}
-        {s.state === "expired" && (
-          <Message title="This signing link has expired">Please contact the {BRAND.name} team and we&apos;ll send you a new link.</Message>
-        )}
+        {s.state === "expired" && <Message title="This signing link has expired">Please contact the {BRAND.name} team and we&apos;ll send you a new link.</Message>}
         {s.state === "declined" && <Message title="Agreement declined">You declined to sign this agreement. If this was a mistake, please contact the {BRAND.name} team.</Message>}
-        {s.state === "finalising" && (
-          <Message title="Thank you — finalising your agreement">
-            We&apos;re waiting for the e-signature provider to confirm your signature. This usually takes a few seconds; you&apos;ll also receive a copy by email.
-            <AutoRefresh seconds={5} />
-          </Message>
+        {contract && (s.state === "ready" || s.state === "finalising" || s.state === "signed") && (
+          <Agreement token={token} contract={contract} state={s.state} />
         )}
-        {s.state === "signed" && (
-          <Message title="Your agreement is signed">
-            Thank you, {s.contract.customerName}. {s.contract.isDemo ? "This was a demo — no legally binding signature was made." : "A copy of the completed agreement has been emailed to you."}
-            {s.contract.signedDocumentPath && (
-              <a href={`/api/sign/${token}/document`} target="_blank" className="mt-5 inline-flex rounded-lg bg-ink px-4 py-2.5 text-[15px] font-medium text-white hover:bg-ink-soft">Download signed copy</a>
-            )}
-          </Message>
-        )}
-        {s.state === "ready" && (await Ready({ token, contract: s.contract }))}
       </main>
-      <footer className="border-t border-line py-6 text-center text-[12px] leading-5 text-muted">
+
+      <footer className="no-print border-t border-line py-6 text-center text-[12px] leading-5 text-muted">
         <p className="mx-auto max-w-xl px-4">
-          {BRAND.legalName} processes the details in this agreement to provide your membership, in line with UK GDPR. Electronic signing is provided by {s.state !== "invalid" && s.contract.esignProvider === "demo" ? "a demo simulator" : "Dropbox Sign"}.
+          {BRAND.legalName} processes the details in this agreement to provide your membership, in line with UK GDPR. Electronic signing is provided by {contract?.esignProvider === "demo" ? "a demo simulator" : "Dropbox Sign"}.
         </p>
         <p className="mt-1">{BRAND.name} · <a href={BRAND.website} className="hover:text-ink">{BRAND.websiteLabel}</a></p>
       </footer>
@@ -69,48 +63,71 @@ function Message({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-async function Ready({ token, contract: c }: { token: string; contract: import("@/lib/types").Contract }) {
-  const { body } = await getContractTemplateBody(c);
-  const blocks = renderTemplate(body, c.fieldValues);
+function Banner({ icon, title, children }: { icon: "check" | "pen" | "clock"; title: string; children: React.ReactNode }) {
+  const paths = {
+    check: <><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></>,
+    pen: <><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  };
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <p className="eyebrow">Welcome</p>
-        <h1 className="mt-3 font-serif text-[28px] font-semibold leading-tight sm:text-[34px]">Hi {c.customerName.split(" ")[0]}, here&apos;s your membership agreement</h1>
-        <p className="mx-auto mt-3 max-w-lg text-[16px] leading-7 text-muted">Please read it carefully. When you&apos;re ready, sign at the bottom of the page — it takes less than a minute.</p>
+    <div className="mb-6 flex gap-4 rounded-2xl border border-bronze-light/60 bg-bronze-wash px-5 py-5 sm:px-6">
+      <svg viewBox="0 0 24 24" className="mt-0.5 size-6 shrink-0 text-bronze" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[icon]}</svg>
+      <div className="min-w-0 flex-1">
+        <h1 className="font-serif text-[19px] font-semibold leading-snug sm:text-[21px]">{title}</h1>
+        <div className="mt-1 text-[15px] leading-6 text-muted">{children}</div>
       </div>
-
-      {c.isDemo && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-[14px] text-red-900">
-          <strong>Demo mode.</strong> This is a test agreement. Signing here is simulated and is not legally binding.
-        </div>
-      )}
-
-      <Card className="grid grid-cols-2 gap-4 p-5 text-[14px] sm:grid-cols-4 sm:p-6">
-        <Summary label="Membership" value={c.durationLabel} />
-        <Summary label="Starts" value={formatLongDate(c.startDate)} />
-        <Summary label="Ends" value={formatLongDate(c.endDate)} />
-        <Summary label="Amount paid" value={`${formatMoney(c.amountPaid, c.currency)}`} sub={PAYMENT_STATUS_LABELS[c.paymentStatus]} />
-      </Card>
-
-      <Card className="px-5 py-8 sm:px-12 sm:py-12">
-        <ContractDocument blocks={blocks} />
-        <div className="mt-8 flex justify-end border-t border-line pt-5">
-          <a href={`/api/sign/${token}/document`} target="_blank" className="text-[14px] font-medium text-bronze-dark hover:underline">Download PDF ↓</a>
-        </div>
-      </Card>
-
-      <SigningPanel token={token} consentStatement={CONSENT_STATEMENT} customerName={c.customerName} mode={c.esignProvider} />
     </div>
   );
 }
 
-function Summary({ label, value, sub }: { label: string; value: string; sub?: string }) {
+async function Agreement({ token, contract: c, state }: { token: string; contract: Contract; state: "ready" | "finalising" | "signed" }) {
+  const doc = await contractDoc(c);
+  const firstName = c.customerName.split(" ")[0];
+
   return (
-    <div>
-      <p className="text-[12px] uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-0.5 font-medium">{value}</p>
-      {sub && <p className="text-[12.5px] text-muted">{sub}</p>}
-    </div>
+    <>
+      <div className="no-print">
+        {state === "signed" && (
+          <Banner icon="check" title="This agreement has been signed">
+            Signed by {c.customerName}
+            {c.signedAt ? ` on ${formatLongDate(c.signedAt.slice(0, 10))}` : ""}. A copy is shown below for your records — you can print or save this page as a PDF.
+            {c.isDemo && <span className="mt-1 block font-semibold text-red-800">Demo mode: this signature is simulated and not legally binding.</span>}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {c.signedDocumentPath && (
+                <a href={`/api/sign/${token}/document`} target="_blank" className="inline-flex items-center rounded-lg bg-ink px-4 py-2 text-[14px] font-medium text-white hover:bg-ink-soft">
+                  Download signed PDF
+                </a>
+              )}
+              <PrintButton />
+            </div>
+          </Banner>
+        )}
+        {state === "finalising" && (
+          <Banner icon="clock" title="Thank you — finalising your agreement">
+            We&apos;re waiting for the e-signature provider to confirm your signature. This usually takes a few seconds, and you&apos;ll also receive a copy by email.
+            <AutoRefresh seconds={5} />
+          </Banner>
+        )}
+        {state === "ready" && (
+          <Banner icon="pen" title={`Hi ${firstName}, please review and sign your agreement`}>
+            Read the agreement below. When you&apos;re ready, confirm and sign at the bottom of the page — it takes less than a minute.
+            {c.isDemo && <span className="mt-1 block font-semibold text-red-800">Demo mode: this is a test agreement. Signing here is simulated and not legally binding.</span>}
+          </Banner>
+        )}
+      </div>
+
+      <PaperSheet>
+        <ContractDocument doc={doc} />
+      </PaperSheet>
+
+      {state === "ready" && (
+        <div className="no-print mx-auto mt-6 max-w-[880px]">
+          <SigningPanel token={token} consentStatement={CONSENT_STATEMENT} customerName={c.customerName} mode={c.esignProvider} />
+          <p className="mt-4 text-center text-[14px]">
+            <a href={`/api/sign/${token}/document`} target="_blank" className="font-medium text-bronze-dark hover:underline">Download this agreement as a PDF</a>
+          </p>
+        </div>
+      )}
+    </>
   );
 }

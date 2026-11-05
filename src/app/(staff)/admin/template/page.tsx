@@ -5,13 +5,18 @@ import { activateTemplateAction } from "@/app/actions/admin";
 import { formatDateTime } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { TemplateEditor } from "@/components/admin/TemplateEditor";
+import { CompanySignatureForm } from "@/components/admin/CompanySignatureForm";
+import { getCompanySignatureSetting } from "@/lib/services/document";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Contract template" };
 
 export default async function TemplatePage() {
   await requireAdmin();
   const store = await getStore();
-  const [versions, staff] = await Promise.all([store.listTemplateVersions(), store.listStaff()]);
+  const [versions, staff, companySig] = await Promise.all([store.listTemplateVersions(), store.listStaff(), getCompanySignatureSetting()]);
+  const sigBytes = companySig?.imagePath ? await store.getFile(companySig.imagePath) : null;
+  const sigImage = sigBytes ? `data:image/${companySig?.imageType === "jpg" ? "jpeg" : "png"};base64,${Buffer.from(sigBytes).toString("base64")}` : null;
   const active = versions.find((v) => v.isActive) ?? null;
   const name = (id: string | null) => staff.find((s) => s.id === id)?.fullName ?? "—";
 
@@ -31,7 +36,11 @@ export default async function TemplatePage() {
         initialBody={active && !active.isSample ? active.body : ""}
         activeVersion={active?.version ?? null}
         sampleBody={active?.isSample ? active.body : null}
+        companySignatory={companySig?.enabled ? { name: companySig.name, role: companySig.role, image: sigImage } : null}
+        legalName={BRAND.legalName}
       />
+
+      <CompanySignatureForm initial={{ enabled: companySig?.enabled ?? false, name: companySig?.name ?? "", role: companySig?.role || `For ${BRAND.name}`, image: sigImage }} />
 
       <Card className="overflow-hidden">
         <h2 className="border-b border-line px-5 py-4 font-serif text-lg font-semibold sm:px-6">Version history</h2>
