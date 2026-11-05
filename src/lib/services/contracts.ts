@@ -7,12 +7,13 @@ import { signingUrl, parseSigningToken, verifySigningMac } from "../signing-link
 import * as ds from "../esign/dropbox-sign";
 import { sendEmail } from "../email/send";
 import { businessCopyEmail, signatureConfirmationEmail, signatureRequestEmail } from "../email/templates";
-import type { Contract, ContractStatus, StaffUser, TemplateVersion } from "../types";
+import { MEMBERSHIP_TIER_LABELS, type Contract, type ContractStatus, type MembershipTier, type StaffUser, type TemplateVersion } from "../types";
 import { formatLongDate, randomToken, sha256Hex } from "../utils";
 import type { ContractInput } from "../validation";
 import type { RequestMeta } from "../request";
 import { buildFieldValues } from "./fields";
 import { buildDoc, companySignatureFields, getCompanySignatureSetting } from "./document";
+import { templateForTier } from "./templates";
 import { audit } from "./audit";
 
 import { UserFacingError } from "../errors";
@@ -55,9 +56,9 @@ async function expireIfDue(c: Contract): Promise<Contract> {
 // Generation
 // ---------------------------------------------------------------------------------------------
 
-async function requireTemplate(): Promise<TemplateVersion> {
-  const t = await (await getStore()).getActiveTemplate();
-  if (!t) throw new UserFacingError("No contract template has been set up yet. An administrator needs to upload the master template first.");
+async function requireTemplate(tier: MembershipTier): Promise<TemplateVersion> {
+  const t = await templateForTier(tier);
+  if (!t) throw new UserFacingError(`No contract template has been set up for ${MEMBERSHIP_TIER_LABELS[tier]} memberships. An administrator needs to add one on the Template page.`);
   if (t.isSample && !config.demoMode) throw new UserFacingError("The sample template cannot be used for real contracts. Upload your approved agreement first.");
   const unfilled = findUnfilled(t.body);
   if (unfilled.length) {
@@ -71,14 +72,14 @@ async function fieldsWithCompany(input: ContractInput, reference: string, issued
 }
 
 export async function previewContract(input: ContractInput) {
-  const template = await requireTemplate();
+  const template = await requireTemplate(input.membershipTier);
   const fieldValues = await fieldsWithCompany(input, "TEC-PREVIEW");
   const { doc } = await buildDoc(template.body, fieldValues);
   return { template, fieldValues, doc };
 }
 
 export async function previewPdf(input: ContractInput): Promise<Uint8Array> {
-  const template = await requireTemplate();
+  const template = await requireTemplate(input.membershipTier);
   const fieldValues = await fieldsWithCompany(input, "TEC-PREVIEW");
   const { doc, companyImage } = await buildDoc(template.body, fieldValues);
   const { bytes } = await generateContractPdf({
@@ -96,7 +97,7 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
   const blockers = productionBlockers();
   if (blockers.length) throw new UserFacingError(`Setup incomplete — ${blockers[0]}. See the setup guide in README.md.`);
   const store = await getStore();
-  const template = await requireTemplate();
+  const template = await requireTemplate(input.membershipTier);
   const reference = await store.nextReference();
   const issuedAt = new Date();
   const fieldValues = await fieldsWithCompany(input, reference, issuedAt.toISOString().slice(0, 10));

@@ -310,7 +310,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div className="text-[14px] leading-6">
               <p className="font-medium">{v.customerName} · <span className="text-muted">{v.customerEmail}</span></p>
-              <p className="text-muted">Template v{preview.templateVersion} · Highlighted text is filled in from the details you entered.</p>
+              <p className="text-muted">Using “{preview.templateTitle}” (v{preview.templateVersion}) · Highlighted text is filled in from the details you entered.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setStep("details")} disabled={!!busy}>Edit details</Button>

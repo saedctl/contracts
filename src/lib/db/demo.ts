@@ -127,20 +127,21 @@ export class DemoStore implements Store {
   }
 
   // ---- templates ----
-  async getActiveTemplate() {
-    return (await this.load()).templates.find((t) => t.isActive) ?? null;
+  async getActiveTemplates() {
+    return (await this.load()).templates.filter((t) => t.isActive).map((t) => ({ ...t, tier: t.tier ?? null }));
   }
   async getTemplateVersion(id: string) {
-    return (await this.load()).templates.find((t) => t.id === id) ?? null;
+    const t = (await this.load()).templates.find((t) => t.id === id);
+    return t ? { ...t, tier: t.tier ?? null } : null;
   }
   async listTemplateVersions() {
-    return [...(await this.load()).templates].sort((a, b) => b.version - a.version);
+    return [...(await this.load()).templates].map((t) => ({ ...t, tier: t.tier ?? null })).sort((a, b) => b.version - a.version);
   }
-  async createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string; isSample?: boolean }) {
+  async createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string; tier: TemplateVersion["tier"]; isSample?: boolean }) {
     return this.mutate((d) => {
       const version = Math.max(0, ...d.templates.map((t) => t.version)) + 1;
       const t: TemplateVersion = {
-        id: randomUUID(), version, title: input.title, body: input.body, notes: input.notes, bodySha256: input.bodySha256,
+        id: randomUUID(), version, tier: input.tier, title: input.title, body: input.body, notes: input.notes, bodySha256: input.bodySha256,
         isActive: false, isSample: !!input.isSample, createdBy: input.createdBy, createdAt: new Date().toISOString(),
       };
       d.templates.push(t);
@@ -149,8 +150,9 @@ export class DemoStore implements Store {
   }
   async activateTemplateVersion(id: string) {
     await this.mutate((d) => {
-      if (!d.templates.some((t) => t.id === id)) throw new Error("Template version not found");
-      for (const t of d.templates) t.isActive = t.id === id;
+      const target = d.templates.find((t) => t.id === id);
+      if (!target) throw new Error("Template version not found");
+      for (const t of d.templates) if ((t.tier ?? null) === (target.tier ?? null)) t.isActive = t.id === id;
     });
   }
 

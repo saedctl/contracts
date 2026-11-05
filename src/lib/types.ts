@@ -34,6 +34,8 @@ export interface StaffUser {
 export interface TemplateVersion {
   id: string;
   version: number;
+  /** Tier this template is for; null = used for any tier without its own template. */
+  tier: MembershipTier | null;
   title: string;
   body: string;
   notes: string | null;

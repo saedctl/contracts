@@ -87,9 +87,9 @@ export function checkTemplate(body: string): TemplateCheck {
     used,
     unknown: used.filter((k) => !KNOWN.has(k)),
     unfilled: findUnfilled(body),
-    missingRecommended: ["customer_name", "membership_start_date", "membership_end_date", "amount_paid"].filter(
-      (k) => !used.includes(k),
-    ),
+    // Client and membership details always appear in the generated details table, so no
+    // individual placeholder is required in the template body.
+    missingRecommended: [],
   };
 }
 

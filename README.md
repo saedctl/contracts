@@ -110,14 +110,16 @@ Every save creates a new, immutable version. A contract records the version it w
 
 ### 7. Company signature and document layout
 
-- **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor (once) to enable app settings.
+- **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor. It enables app settings and per-tier templates, and is safe to run again.
 - **Company signature:** go to **Template → Company signature**, enter the signatory (e.g. Saed Farah) and optionally upload a signature image. It is auto-applied to every new contract and dated on the day the contract is issued. Contracts already issued keep the signature they were created with.
 - **Legal entity:** set `COMPANY_LEGAL_NAME` if the contracting company isn't Harbor Security Ltd.
 - **Document layout:**
   - The first `# heading` becomes the centred title, and an `*italic*` line right below it becomes the tagline.
   - The Provider/Client section and the details table are added at the top automatically, and the signature block at the end. To place them yourself, put `{{parties}}`, `{{details_table}}` or `{{signatures}}` on a line of their own.
   - `✓ item` makes a tick-mark list, and `> text` makes a highlighted box.
-- **Membership tier:** the form asks for **Premium** or **VIP**. It's shown as a badge on the customer's page and in the details table, and is available in templates as `{{membership_tier}}`.
+- **Membership tier:** the form asks for **Premium** or **VIP**. The tier decides which template is used. It's shown as a badge on the customer's page and in the details table, and is available in templates as `{{membership_tier}}`.
+- **Templates per tier:** the Template page has **All tiers / Premium / VIP** tabs. A contract uses its tier's own active template if there is one, otherwise the All tiers template. Each tab has its own version history.
+- **Payment placeholders:** `{{total_fee}}` (paid + outstanding), `{{balance_due_date}}`, and `{{payment_summary}}`. The last is a full sentence that adapts to "paid in full" or "balance due by …".
 
 ## How signing works
 

@@ -1,4 +1,4 @@
-import type { AuditEvent, Contract, ContractStatus, EmailLogEntry, NewContract, StaffRole, StaffUser, TemplateVersion } from "../types";
+import type { AuditEvent, Contract, ContractStatus, EmailLogEntry, MembershipTier, NewContract, StaffRole, StaffUser, TemplateVersion } from "../types";
 
 export interface ContractFilter {
   /** Restrict to contracts created by this staff member (sales reps). */
@@ -20,11 +20,12 @@ export interface Store {
   updateStaff(id: string, patch: { fullName?: string; role?: StaffRole; active?: boolean }): Promise<StaffUser>;
   setStaffPassword(id: string, password: string): Promise<void>;
 
-  // Templates (versions are append-only)
-  getActiveTemplate(): Promise<TemplateVersion | null>;
+  // Templates (versions are append-only). One version is active per tier (null = all tiers).
+  getActiveTemplates(): Promise<TemplateVersion[]>;
   getTemplateVersion(id: string): Promise<TemplateVersion | null>;
   listTemplateVersions(): Promise<TemplateVersion[]>;
-  createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string }): Promise<TemplateVersion>;
+  createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string; tier: MembershipTier | null }): Promise<TemplateVersion>;
+  /** Makes this version the active one for its tier. */
   activateTemplateVersion(id: string): Promise<void>;
 
   // Contracts

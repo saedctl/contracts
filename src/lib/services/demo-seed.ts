@@ -36,7 +36,7 @@ export async function seedDemo(store: DemoStore) {
 
   const t = await store.createTemplateVersion({
     title: SAMPLE_TEMPLATE_TITLE, body: SAMPLE_TEMPLATE_BODY, notes: "Demo placeholder — contains no legal terms.",
-    createdBy: admin.id, bodySha256: sha256Hex(SAMPLE_TEMPLATE_BODY), isSample: true,
+    createdBy: admin.id, bodySha256: sha256Hex(SAMPLE_TEMPLATE_BODY), isSample: true, tier: null,
   });
   await store.activateTemplateVersion(t.id);
   await store.setSetting("company_signature", {
