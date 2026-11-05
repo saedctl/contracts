@@ -10,7 +10,9 @@ export function randomToken(bytes = 24): string {
 }
 
 export function formatMoney(amount: number, currency: Currency): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amount);
+  // Whole amounts read like the contract wording ("£2,800"); pennies are shown when present.
+  const whole = Number.isInteger(Math.round(amount * 100) / 100);
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }).format(amount);
 }
 
 const MONTHS = [
