@@ -1,26 +1,14 @@
 # Membership Agreement
 
-**Reference:** {{contract_reference}}
-**Date issued:** {{contract_date}}
+*Everything you need to build the skills and the evidence.*
 
-This Membership Agreement (the **Agreement**) is made between:
-
-**{{company_name}}**, trading as {{business_name}} ({{community_url}}), company number [ADD: company number], registered office [ADD: registered office address] (**we**, **us**, **our**); and
-
-**{{customer_name}}**, email {{customer_email}}, telephone {{customer_phone}} (**you**, **your**, the **Member**).
-
----
+{{parties}}
 
 ## 1. Your membership
 
-**Membership duration:** {{membership_duration}}
-**Start date:** {{membership_start_date}}
-**End date:** {{membership_end_date}}
+{{details_table}}
 
-**Amount paid:** {{amount_paid}} ({{currency}})
-**Payment status:** {{payment_status}}
-**Outstanding balance:** {{outstanding_balance}}
-**Payment schedule:** {{payment_schedule}}
+In this Agreement, **we**, **us** and **our** mean {{company_name}}, trading as {{business_name}} ({{community_url}}), company number [ADD: company number], registered office [ADD: registered office address]. **You**, **your** and **the Member** mean the client named above. Reference {{contract_reference}}, issued {{contract_date}}.
 
 ## 2. What the membership includes
 
@@ -134,4 +122,4 @@ This Membership Agreement (the **Agreement**) is made between:
 
 ---
 
-By signing below, you confirm that you have read and agree to this Agreement.
+*I confirm that I have read, understood and agree to the terms of this Agreement.*

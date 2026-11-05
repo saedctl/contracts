@@ -108,6 +108,17 @@ Every save creates a new, immutable version. A contract records the version it w
 
 **Formatting:** `# Heading`, `## Sub-heading`, `**bold**`, `*italic*`, `- bullet`, `---` divider, and a blank line between paragraphs. A signature page (member name, email, signature and date fields, document reference and template version) is added automatically. It contains no contractual wording.
 
+### 7. Company signature and document layout
+
+- **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor (once) to enable app settings.
+- **Company signature:** go to **Template → Company signature**, enter the signatory (e.g. Saed Farah) and optionally upload a signature image. It is auto-applied to every new contract and dated on the day the contract is issued. Contracts already issued keep the signature they were created with.
+- **Legal entity:** set `COMPANY_LEGAL_NAME` if the contracting company isn't Harbor Security Ltd.
+- **Document layout:**
+  - The first `# heading` becomes the centred title, and an `*italic*` line right below it becomes the tagline.
+  - The Provider/Client section and the details table are added at the top automatically, and the signature block at the end. To place them yourself, put `{{parties}}`, `{{details_table}}` or `{{signatures}}` on a line of their own.
+  - `✓ item` makes a tick-mark list, and `> text` makes a highlighted box.
+- **Membership tier:** the form asks for **Premium** or **VIP**. It's shown as a badge on the customer's page and in the details table, and is available in templates as `{{membership_tier}}`.
+
 ## How signing works
 
 ```

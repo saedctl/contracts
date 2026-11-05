@@ -4,9 +4,13 @@
 //   # Heading / ## Sub-heading / ### Minor heading
 //   Blank line           → new paragraph (single line breaks inside a paragraph are kept)
 //   - item / * item      → bullet point
+//   ✓ item / - [x] item  → tick-mark list item
+//   > text               → highlighted callout box
 //   ---                  → horizontal rule
 //   **bold**  *italic*   → emphasis;  \*  → literal asterisk
 //   {{placeholder}}      → replaced with the customer-specific value
+//   {{parties}} / {{details_table}} / {{signatures}} on a line of their own place those
+//   generated sections; any not placed are added automatically (see lib/document.ts).
 
 export const PLACEHOLDERS = [
   { key: "customer_name", label: "Customer full name", example: "Sarah Ahmed" },
@@ -15,6 +19,7 @@ export const PLACEHOLDERS = [
   { key: "membership_start_date", label: "Membership start date", example: "1 November 2026" },
   { key: "membership_end_date", label: "Membership end date", example: "31 October 2027" },
   { key: "membership_duration", label: "Membership duration", example: "12 months" },
+  { key: "membership_tier", label: "Membership tier", example: "Premium" },
   { key: "amount_paid", label: "Amount paid", example: "£999.00" },
   { key: "currency", label: "Currency code", example: "GBP" },
   { key: "payment_status", label: "Payment status", example: "Paid in Full" },
@@ -28,15 +33,28 @@ export const PLACEHOLDERS = [
 ] as const;
 
 export type PlaceholderKey = (typeof PLACEHOLDERS)[number]["key"];
-const KNOWN = new Set<string>(PLACEHOLDERS.map((p) => p.key));
+
+/** Placeholders that stand for a whole generated section and must be on a line of their own. */
+export const BLOCK_PLACEHOLDERS = [
+  { key: "parties", label: "Provider / client section", example: "" },
+  { key: "details_table", label: "Membership details table", example: "" },
+  { key: "signatures", label: "Signature block", example: "" },
+] as const;
+export type SectionKey = (typeof BLOCK_PLACEHOLDERS)[number]["key"];
+const SECTION_KEYS = new Set<string>(BLOCK_PLACEHOLDERS.map((p) => p.key));
+
+const KNOWN = new Set<string>([...PLACEHOLDERS.map((p) => p.key), ...SECTION_KEYS]);
 
 export type Inline =
   | { kind: "text"; text: string; bold: boolean; italic: boolean }
   | { kind: "field"; key: string; bold: boolean; italic: boolean };
 
+type TextBlockType = "h1" | "h2" | "h3" | "p" | "li" | "check" | "callout";
+
 export type Block =
-  | { type: "h1" | "h2" | "h3" | "p" | "li"; inlines: Inline[] }
-  | { type: "hr" };
+  | { type: TextBlockType; inlines: Inline[] }
+  | { type: "hr" }
+  | { type: "section"; key: SectionKey };
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
 
@@ -123,15 +141,37 @@ export function parseTemplate(body: string): Block[] {
   const blocks: Block[] = [];
   const lines = body.replace(/\r\n?/g, "\n").split("\n");
   let para: string[] = [];
+  let quote: string[] = [];
   const flushPara = () => {
     if (para.length) blocks.push({ type: "p", inlines: parseInlines(para.join("\n")) });
     para = [];
+  };
+  const flushQuote = () => {
+    if (quote.length) blocks.push({ type: "callout", inlines: parseInlines(quote.join("\n")) });
+    quote = [];
+  };
+  const flush = () => {
+    flushPara();
+    flushQuote();
   };
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, "");
     const trimmed = line.trim();
     if (!trimmed) {
+      flush();
+      continue;
+    }
+    const callout = /^>\s?(.*)$/.exec(trimmed);
+    if (callout) {
       flushPara();
+      quote.push(callout[1]);
+      continue;
+    }
+    flushQuote();
+    const section = /^\{\{\s*([a-z_]+)\s*\}\}$/.exec(trimmed);
+    if (section && SECTION_KEYS.has(section[1])) {
+      flushPara();
+      blocks.push({ type: "section", key: section[1] as SectionKey });
       continue;
     }
     const heading = /^(#{1,3})\s+(.*)$/.exec(trimmed);
@@ -146,6 +186,12 @@ export function parseTemplate(body: string): Block[] {
       blocks.push({ type: "hr" });
       continue;
     }
+    const check = /^(?:[✓✔]|[-*]\s+\[[xX]\])\s+(.*)$/.exec(trimmed);
+    if (check) {
+      flushPara();
+      blocks.push({ type: "check", inlines: parseInlines(check[1]) });
+      continue;
+    }
     const bullet = /^[-*•]\s+(.*)$/.exec(trimmed);
     if (bullet) {
       flushPara();
@@ -154,7 +200,7 @@ export function parseTemplate(body: string): Block[] {
     }
     para.push(trimmed);
   }
-  flushPara();
+  flush();
   return blocks;
 }
 
@@ -167,7 +213,10 @@ export interface Run {
   missing?: boolean;
 }
 
-export type RenderedBlock = { type: "h1" | "h2" | "h3" | "p" | "li"; runs: Run[] } | { type: "hr" };
+export type RenderedBlock =
+  | { type: TextBlockType; runs: Run[] }
+  | { type: "hr" }
+  | { type: "section"; key: SectionKey };
 
 /**
  * Substitutes field values into parsed blocks. Values are inserted as plain text runs, so
@@ -175,7 +224,7 @@ export type RenderedBlock = { type: "h1" | "h2" | "h3" | "p" | "li"; runs: Run[]
  */
 export function renderTemplate(body: string, values: Record<string, string>): RenderedBlock[] {
   return parseTemplate(body).map((block) => {
-    if (block.type === "hr") return block;
+    if (block.type === "hr" || block.type === "section") return block;
     return {
       type: block.type,
       runs: block.inlines.map((inline) => {

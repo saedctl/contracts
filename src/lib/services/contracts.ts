@@ -1,7 +1,7 @@
 import "server-only";
 import { config, productionBlockers } from "../config";
 import { getStore } from "../db";
-import { findUnfilled, renderTemplate } from "../template";
+import { findUnfilled } from "../template";
 import { applyDemoSignature, generateContractPdf, type ContractLayout, type DemoSignature } from "../pdf";
 import { signingUrl, parseSigningToken, verifySigningMac } from "../signing-link";
 import * as ds from "../esign/dropbox-sign";
@@ -12,9 +12,11 @@ import { formatLongDate, randomToken, sha256Hex } from "../utils";
 import type { ContractInput } from "../validation";
 import type { RequestMeta } from "../request";
 import { buildFieldValues } from "./fields";
+import { buildDoc, companySignatureFields, getCompanySignatureSetting } from "./document";
 import { audit } from "./audit";
 
-export class UserFacingError extends Error {}
+import { UserFacingError } from "../errors";
+export { UserFacingError };
 
 export const CONSENT_STATEMENT =
   "I agree to sign this agreement electronically. I understand that my electronic signature has the same effect as a handwritten signature, and that I can request a paper copy from The Engineers Club.";
@@ -64,17 +66,24 @@ async function requireTemplate(): Promise<TemplateVersion> {
   return t;
 }
 
+async function fieldsWithCompany(input: ContractInput, reference: string, issuedOn?: string) {
+  return { ...buildFieldValues(input, reference, issuedOn), ...companySignatureFields(await getCompanySignatureSetting()) };
+}
+
 export async function previewContract(input: ContractInput) {
   const template = await requireTemplate();
-  const fieldValues = buildFieldValues(input, "TEC-PREVIEW");
-  return { template, fieldValues, blocks: renderTemplate(template.body, fieldValues) };
+  const fieldValues = await fieldsWithCompany(input, "TEC-PREVIEW");
+  const { doc } = await buildDoc(template.body, fieldValues);
+  return { template, fieldValues, doc };
 }
 
 export async function previewPdf(input: ContractInput): Promise<Uint8Array> {
-  const { template, fieldValues, blocks } = await previewContract(input);
+  const template = await requireTemplate();
+  const fieldValues = await fieldsWithCompany(input, "TEC-PREVIEW");
+  const { doc, companyImage } = await buildDoc(template.body, fieldValues);
   const { bytes } = await generateContractPdf({
-    blocks, reference: fieldValues.contract_reference, templateVersion: template.version, customerName: input.customerName,
-    customerEmail: input.customerEmail, issuedAt: new Date(), textTags: false, demo: config.demoMode, preview: true,
+    doc, reference: fieldValues.contract_reference, templateVersion: template.version, issuedAt: new Date(),
+    companySignatureImage: companyImage, textTags: false, demo: config.demoMode, preview: true,
   });
   return bytes;
 }
@@ -90,12 +99,12 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
   const template = await requireTemplate();
   const reference = await store.nextReference();
   const issuedAt = new Date();
-  const fieldValues = buildFieldValues(input, reference, issuedAt.toISOString().slice(0, 10));
+  const fieldValues = await fieldsWithCompany(input, reference, issuedAt.toISOString().slice(0, 10));
   const provider = esignProvider();
 
+  const { doc, companyImage } = await buildDoc(template.body, fieldValues);
   const { bytes, layout } = await generateContractPdf({
-    blocks: renderTemplate(template.body, fieldValues), reference, templateVersion: template.version,
-    customerName: input.customerName, customerEmail: input.customerEmail, issuedAt,
+    doc, reference, templateVersion: template.version, issuedAt, companySignatureImage: companyImage,
     textTags: provider === "dropbox_sign", demo: provider === "demo",
   });
   const documentSha256 = sha256Hex(bytes);
@@ -331,7 +340,13 @@ export async function completeDemoSignature(c: Contract, sig: DemoSignature, met
   const sha = sha256Hex(signed);
   const path = `${c.id}/signed-demo-${sha.slice(0, 12)}.pdf`;
   await store.putFile(path, signed, "application/pdf");
-  await store.updateContract(c.id, { status: "signed", signedAt, signedDocumentPath: path, signedDocumentSha256: sha });
+  const demoSignature = sig.image && sig.imageType
+    ? { image: `data:image/${sig.imageType === "png" ? "png" : "jpeg"};base64,${Buffer.from(sig.image).toString("base64")}` }
+    : { typedName: sig.typedName };
+  await store.updateContract(c.id, {
+    status: "signed", signedAt, signedDocumentPath: path, signedDocumentSha256: sha,
+    providerData: { ...(c.providerData ?? {}), demoSignature },
+  });
   await audit(c.id, { type: "customer", label: c.customerEmail }, "contract.signed_demo", { method: sig.kind, signedSha256: sha, simulated: true }, meta);
   await sendConfirmations(c.id);
 }

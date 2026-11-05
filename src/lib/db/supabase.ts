@@ -175,6 +175,23 @@ export class SupabaseStore implements Store {
     if (filter.contractId) query = query.eq("contract_id", filter.contractId);
     return check(await query).map((r) => camelRow<EmailLogEntry>(r));
   }
+  async getSetting<T>(key: string) {
+    const res = await this.db.from("app_settings").select("value").eq("key", key).maybeSingle();
+    if (res.error) {
+      // Table missing (migration 0002 not run yet): behave as if nothing is configured.
+      console.warn(`app_settings unavailable: ${res.error.message}`);
+      return null;
+    }
+    return (res.data?.value as T | undefined) ?? null;
+  }
+  async setSetting(key: string, value: unknown) {
+    const res = await this.db.from("app_settings").upsert({ key, value, updated_at: new Date().toISOString() });
+    if (res.error) {
+      throw new Error(res.error.message.includes("app_settings")
+        ? "Run supabase/migrations/0002_settings.sql in the Supabase SQL Editor first."
+        : `Database error: ${res.error.message}`);
+    }
+  }
   async claimWebhookEvent(key: string, provider: string, eventType: string, payload: unknown) {
     const res = await this.db.from("webhook_events").insert({ event_key: key, provider, event_type: eventType, payload });
     if (res.error?.code === "23505") return false;

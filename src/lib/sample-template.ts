@@ -5,35 +5,33 @@
  */
 export const SAMPLE_TEMPLATE_TITLE = "Sample template (replace with your approved agreement)";
 
-export const SAMPLE_TEMPLATE_BODY = `# Membership Agreement
+export const SAMPLE_TEMPLATE_BODY = `# {{membership_tier}} Membership Agreement
 
-**Reference:** {{contract_reference}}
-**Date:** {{contract_date}}
+*Everything you need to build the skills and the evidence.*
 
-This agreement is between **{{company_name}}**, trading as {{business_name}} ({{community_url}}), and the member named below.
+{{parties}}
 
-## Member details
+{{details_table}}
 
-**Name:** {{customer_name}}
-**Email:** {{customer_email}}
-**Phone:** {{customer_phone}}
+## 1. Services included
 
-## Membership
+*[SAMPLE TEMPLATE — list what the membership includes here, for example:]*
 
-**Duration:** {{membership_duration}}
-**Start date:** {{membership_start_date}}
-**End date:** {{membership_end_date}}
+✓ Full curriculum access
+✓ Weekly live Q&A
+✓ Private community access
 
-## Payment
+## 2. Fees & payment
 
-**Amount paid:** {{amount_paid}} ({{currency}})
-**Payment status:** {{payment_status}}
-**Outstanding balance:** {{outstanding_balance}}
-**Payment schedule:** {{payment_schedule}}
+The fee for this membership is {{amount_paid}} ({{payment_status}}). Outstanding balance: {{outstanding_balance}}. Payment schedule: {{payment_schedule}}.
+
+> *[SAMPLE TEMPLATE — a highlighted note, e.g. your payment or refund acknowledgement, goes here.]*
+
+## 3. Terms and conditions
+
+*[SAMPLE TEMPLATE — the approved terms and conditions, refund policy and other clauses of your existing membership contract go here. An administrator can replace this template under Template in the dashboard. This sample contains no legal terms and must not be used with real customers.]*
 
 ---
 
-## Terms and conditions
-
-*[SAMPLE TEMPLATE — the approved terms and conditions, refund policy and other clauses of your existing membership contract go here. An administrator can replace this template under Template in the dashboard. This sample contains no legal terms and must not be used with real customers.]*
+*I confirm that I have read, understood and agree to the terms of this Agreement.*
 `;

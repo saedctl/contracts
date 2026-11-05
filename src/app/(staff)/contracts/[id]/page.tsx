@@ -5,11 +5,11 @@ import { requireUser } from "@/lib/auth/session";
 import { getStore } from "@/lib/db";
 import { getContractForStaff } from "@/lib/services/contracts";
 import { EVENT_LABELS } from "@/lib/services/audit";
-import { renderTemplate } from "@/lib/template";
+import { contractDoc } from "@/lib/services/document";
 import { PAYMENT_STATUS_LABELS } from "@/lib/types";
 import { formatDateTime, formatLongDate, formatMoney } from "@/lib/utils";
 import { Alert, ButtonLink, Card, StatusBadge } from "@/components/ui";
-import { ContractDocument } from "@/components/ContractDocument";
+import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 import { ContractActions } from "@/components/contracts/ContractActions";
 
 export const metadata: Metadata = { title: "Contract" };
@@ -21,10 +21,10 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const c = await getContractForStaff(user, (await params).id);
   if (!c) notFound();
   const store = await getStore();
-  const [events, emails, template] = await Promise.all([
+  const [events, emails, doc] = await Promise.all([
     store.listAuditEvents({ contractId: c.id, limit: 100 }),
     store.listEmailLog({ contractId: c.id }),
-    store.getTemplateVersion(c.templateVersionId),
+    c.anonymisedAt ? Promise.resolve(null) : contractDoc(c),
   ]);
   const pd = (c.providerData ?? {}) as { signer?: Signer; testMode?: boolean; signatureRequestId?: string };
   const awaiting = c.status === "sent" || c.status === "viewed";
@@ -86,6 +86,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
               {c.paymentSchedule && <Item label="Payment schedule" value={c.paymentSchedule} />}
               <Item label="Created by" value={c.createdByName ?? "—"} />
               <Item label="Template" value={`Version ${c.templateVersion ?? "?"}`} />
+              {c.fieldValues.membership_tier && <Item label="Membership tier" value={c.fieldValues.membership_tier} />}
             </dl>
           </Card>
 
@@ -108,12 +109,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             </Card>
           )}
 
-          {template && (
+          {doc && (
             <Card className="overflow-hidden">
               <details>
-                <summary className="cursor-pointer select-none px-5 py-4 font-serif text-lg font-semibold sm:px-6">Contract text</summary>
-                <div className="border-t border-line px-5 py-8 sm:px-10">
-                  <ContractDocument blocks={renderTemplate(template.body, c.fieldValues)} />
+                <summary className="cursor-pointer select-none px-5 py-4 font-serif text-lg font-semibold sm:px-6">Contract as the customer sees it</summary>
+                <div className="border-t border-line">
+                  <PaperSheet>
+                    <ContractDocument doc={doc} />
+                  </PaperSheet>
                 </div>
               </details>
             </Card>

@@ -4,18 +4,19 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { calculateEndDate, describeTerm, DURATION_OPTIONS } from "@/lib/dates";
 import { contractInputSchema, zodFieldErrors, type FieldErrors } from "@/lib/validation";
-import type { RenderedBlock } from "@/lib/template";
+import type { ContractDoc } from "@/lib/document";
+import { MEMBERSHIP_TIERS, MEMBERSHIP_TIER_LABELS, type MembershipTier } from "@/lib/types";
 import { Alert, Button, ButtonLink, Card, Field, Spinner, cx } from "@/components/ui";
-import { ContractDocument } from "@/components/ContractDocument";
+import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 
 type Step = "details" | "review" | "sent";
 type Values = {
   customerName: string; customerEmail: string; customerPhone: string;
-  duration: string; startDate: string; endDate: string;
+  membershipTier: MembershipTier | ""; duration: string; startDate: string; endDate: string;
   amountPaid: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
   paymentSchedule: string; outstandingBalance: string;
 };
-type Preview = { blocks: RenderedBlock[]; templateVersion: number; templateTitle: string; isSample: boolean };
+type Preview = { doc: ContractDoc; templateVersion: number; templateTitle: string; isSample: boolean };
 type Sent = { id: string; reference: string; customerEmail: string; emailSimulated: boolean; demo: boolean };
 
 const STEPS: { key: Step; label: string }[] = [
@@ -28,7 +29,7 @@ export function NewContractFlow({ today }: { today: string }) {
   const [step, setStep] = useState<Step>("details");
   const [v, setV] = useState<Values>({
     customerName: "", customerEmail: "", customerPhone: "",
-    duration: "", startDate: today, endDate: "",
+    membershipTier: "", duration: "", startDate: today, endDate: "",
     amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "",
   });
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -214,6 +215,26 @@ export function NewContractFlow({ today }: { today: string }) {
 
           <Card className="p-5 sm:p-7">
             <h2 className="font-serif text-lg font-semibold">Membership details</h2>
+            <Field label="Membership tier" htmlFor="membershipTier" required error={errors.membershipTier} className="mt-5">
+              <div id="membershipTier" role="radiogroup" aria-label="Membership tier" aria-invalid={!!errors.membershipTier} tabIndex={-1} className="grid grid-cols-2 gap-2 sm:max-w-sm">
+                {MEMBERSHIP_TIERS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={v.membershipTier === t}
+                    onClick={() => set("membershipTier", t)}
+                    className={cx(
+                      "rounded-lg border px-4 py-2.5 text-[15px] font-medium transition",
+                      v.membershipTier === t ? "border-ink bg-ink text-white" : "border-line-strong bg-white text-ink hover:border-ink/40",
+                      errors.membershipTier && v.membershipTier !== t && "border-red-700/70",
+                    )}
+                  >
+                    {MEMBERSHIP_TIER_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </Field>
             <div className="mt-5 grid gap-5 sm:grid-cols-3">
               <Field label="Membership duration" htmlFor="duration" required error={errors.duration}>
                 <select id="duration" className="field-input" value={v.duration} onChange={(e) => set("duration", e.target.value)} aria-invalid={!!errors.duration}>
@@ -293,12 +314,9 @@ export function NewContractFlow({ today }: { today: string }) {
             </div>
           </Card>
           {preview.isSample && <Alert tone="warning">This preview uses the sample template, which contains no legal terms.</Alert>}
-          <Card className="px-5 py-8 sm:px-12 sm:py-12">
-            <ContractDocument blocks={preview.blocks} highlight />
-            <div className="mt-10 rounded-xl border border-dashed border-line-strong p-5 text-[14px] text-muted">
-              A signature page is added at the end for the customer to sign electronically.
-            </div>
-          </Card>
+          <PaperSheet>
+            <ContractDocument doc={preview.doc} highlight />
+          </PaperSheet>
           <div className="sticky bottom-4 z-10 flex flex-col-reverse gap-3 rounded-2xl border border-line bg-white/95 p-3 shadow-pop backdrop-blur sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setStep("details")} disabled={!!busy}>Back</Button>
             <Button onClick={doSend} disabled={!!busy} className="py-3">
@@ -324,7 +342,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <p className="mt-3 text-[13px] text-muted">Reference {sent.reference}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <ButtonLink href={`/contracts/${sent.id}`} variant="secondary">View contract</ButtonLink>
-            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "" })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
+            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "" })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
           </div>
         </Card>
       )}
