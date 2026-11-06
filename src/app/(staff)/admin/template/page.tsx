@@ -42,6 +42,8 @@ export default async function TemplatePage({ searchParams }: { searchParams: Pro
         </p>
       </div>
 
+      <CompanySignatureForm key={companySig?.updatedAt ?? "none"} initial={{ enabled: companySig?.enabled ?? false, name: companySig?.name ?? "", role: companySig?.role || `For ${BRAND.name}`, image: sigImage }} />
+
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Template for">
           {tabs.map((t) => (
@@ -85,7 +87,6 @@ export default async function TemplatePage({ searchParams }: { searchParams: Pro
         legalName={BRAND.legalName}
       />
 
-      <CompanySignatureForm initial={{ enabled: companySig?.enabled ?? false, name: companySig?.name ?? "", role: companySig?.role || `For ${BRAND.name}`, image: sigImage }} />
 
       <Card className="overflow-hidden">
         <h2 className="border-b border-line px-5 py-4 font-serif text-lg font-semibold sm:px-6">Version history — {tierLabel(tier)}</h2>

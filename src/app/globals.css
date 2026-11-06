@@ -78,8 +78,8 @@ body {
 .contract-doc .doc-sig-area { @apply flex h-20 items-end border-b border-ink/60 pb-2; }
 .contract-doc .doc-sig-script { @apply font-serif text-[26px] italic leading-none text-ink; }
 .contract-doc .doc-sig-pending { @apply text-[13px] font-sans uppercase tracking-wide text-muted/70; }
-.contract-doc .doc-sig-name { @apply mt-3 mb-0 font-semibold leading-normal; }
-.contract-doc .doc-sig-meta { @apply mb-0 text-[13.5px] leading-normal text-muted; }
+.contract-doc .doc-sig-name { @apply mt-3 mb-0 text-left font-semibold leading-normal; }
+.contract-doc .doc-sig-meta { @apply mb-0 text-left text-[13.5px] leading-normal text-muted; }
 
 .contract-doc mark { @apply rounded bg-bronze-wash px-0.5 text-ink; box-shadow: inset 0 -1px 0 var(--color-bronze-light); }
 .contract-doc mark.missing { @apply bg-red-50 text-red-800; box-shadow: inset 0 -1px 0 #fca5a5; }

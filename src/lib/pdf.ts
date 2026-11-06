@@ -460,7 +460,8 @@ export async function generateContractPdf(opts: GenerateOptions): Promise<{ byte
   }
 
   // ---- Document details ----
-  w.ensure(70);
+  // Two short lines: keep them on the signature page when they fit.
+  w.ensure(36);
   w.y -= 6;
   const meta = `Reference ${opts.reference} · Template v${opts.templateVersion} · Issued ${opts.issuedAt.toISOString().slice(0, 10)} by ${BRAND.legalName}`;
   w.page.drawText(safeText(fonts.sans, meta), { x: MARGIN_X, y: w.y, size: 7.5, font: fonts.sans, color: MUTED });
