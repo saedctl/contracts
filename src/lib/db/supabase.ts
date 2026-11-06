@@ -229,7 +229,15 @@ export class SupabaseStore implements Store {
   // ---- files ----
   async putFile(path: string, bytes: Uint8Array, contentType: string) {
     const { error } = await this.db.storage.from(BUCKET).upload(path, bytes, { contentType, upsert: false });
-    if (error) throw new Error(`Storage upload failed: ${error.message}`);
+    if (error) {
+      // The bucket only accepted PDFs before migration 0002, so signature images were rejected.
+      if (/mime type|not supported|invalid_mime_type/i.test(error.message) && contentType.startsWith("image/")) {
+        throw new UserFacingError(
+          "The database needs an update before images can be uploaded. In Supabase, open SQL Editor, paste in supabase/apply-updates.sql from the repository and click Run, then try again.",
+        );
+      }
+      throw new Error(`Storage upload failed: ${error.message}`);
+    }
   }
   async getFile(path: string) {
     const { data, error } = await this.db.storage.from(BUCKET).download(path);
