@@ -39,6 +39,13 @@ export function formatLongDate(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/** 6 Nov 2026 — compact form for tables. */
+export function formatShortDate(iso: string): string {
+  const d = parseISODate(iso.slice(0, 10));
+  if (!d) return iso;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)} ${d.getUTCFullYear()}`;
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("en-GB", {

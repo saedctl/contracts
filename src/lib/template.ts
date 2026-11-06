@@ -31,6 +31,7 @@ export const PLACEHOLDERS = [
   { key: "contract_reference", label: "Contract reference", example: "TEC-2026-0042" },
   { key: "contract_date", label: "Date the agreement was issued", example: "27 October 2026" },
   { key: "company_name", label: "Legal company name", example: "Harbor Security Ltd" },
+  { key: "company_number", label: "Company number", example: "17242789" },
   { key: "business_name", label: "Business name", example: "The Engineers Club" },
   { key: "community_url", label: "Community website", example: "https://theengineers.club" },
 ] as const;

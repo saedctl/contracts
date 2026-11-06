@@ -8,6 +8,7 @@ export function AppNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const links = [
     { href: "/dashboard", label: "Contracts", match: (p: string) => p === "/dashboard" || p.startsWith("/contracts") },
+    { href: "/payments", label: "Payments", match: (p: string) => p.startsWith("/payments") },
     ...(isAdmin
       ? [
           { href: "/admin/template", label: "Template", match: (p: string) => p.startsWith("/admin/template") },

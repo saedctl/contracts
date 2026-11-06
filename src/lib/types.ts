@@ -20,6 +20,15 @@ export const MEMBERSHIP_TIERS = ["premium", "vip"] as const;
 export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
 export const MEMBERSHIP_TIER_LABELS: Record<MembershipTier, string> = { premium: "Premium", vip: "VIP" };
 
+/** One scheduled payment of the outstanding balance. Amount and due date are contract terms. */
+export interface Instalment {
+  id: string;
+  amount: number;
+  dueDate: string; // YYYY-MM-DD
+  collectedAt: string | null;
+  collectedBy: string | null;
+}
+
 export type EsignProvider = "dropbox_sign" | "demo";
 
 export interface StaffUser {
@@ -67,6 +76,13 @@ export interface Contract {
   paymentStatus: PaymentStatus;
   paymentSchedule: string | null;
   outstandingBalance: number;
+  /** YYYY-MM-DD the outstanding balance is due, if any. */
+  balanceDueDate: string | null;
+  /** When staff recorded the outstanding balance as collected. */
+  balanceCollectedAt: string | null;
+  balanceCollectedBy: string | null;
+  /** Payment plan for the outstanding balance (empty for older contracts: see lib/payments). */
+  instalments: Instalment[];
   templateVersionId: string;
   templateVersion?: number;
   fieldValues: FieldValues;

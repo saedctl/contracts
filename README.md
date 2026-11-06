@@ -112,7 +112,7 @@ Every save creates a new, immutable version. A contract records the version it w
 
 - **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor. It enables app settings and per-tier templates, and is safe to run again.
 - **Company signature:** go to **Template → Company signature**, enter the signatory (e.g. Saed Farah) and optionally upload a signature image. It is auto-applied to every new contract and dated on the day the contract is issued. Contracts already issued keep the signature they were created with.
-- **Legal entity:** set `COMPANY_LEGAL_NAME` if the contracting company isn't Harbor Security Ltd.
+- **Legal entity:** contracts are issued by Harbor Security Ltd (company number 17242789), trading as The Engineers Club. Placeholders are `{{company_name}}` and `{{company_number}}`; override them with `COMPANY_LEGAL_NAME` / `COMPANY_NUMBER` only if this changes. A contract is never created if a placeholder it uses has no value.
 - **Document layout:**
   - The first `# heading` becomes the centred title, and an `*italic*` line right below it becomes the tagline.
   - The Provider/Client section and the details table are added at the top automatically, and the signature block at the end. To place them yourself, put `{{parties}}`, `{{details_table}}` or `{{signatures}}` on a line of their own.
@@ -120,6 +120,14 @@ Every save creates a new, immutable version. A contract records the version it w
 - **Membership tier:** the form asks for **Premium** or **VIP**. The tier decides which template is used. It's shown as a badge on the customer's page and in the details table, and is available in templates as `{{membership_tier}}`.
 - **Templates per tier:** the Template page has **All tiers / Premium / VIP** tabs. A contract uses its tier's own active template if there is one, otherwise the All tiers template. Each tab has its own version history.
 - **Payment placeholders:** `{{total_fee}}` (paid + outstanding), `{{balance_due_date}}`, and `{{payment_summary}}`. The last is a full sentence that adapts to "paid in full" or "balance due by …".
+
+### 8. Payments and admin deletion
+
+- **Database setup:** run [`supabase/migrations/0003_payments.sql`](supabase/migrations/0003_payments.sql) in the Supabase SQL Editor (safe to re-run).
+- **Payments page:** lists signed contracts with cash collected (amount and date) and cash to be collected (amount and due date) against each member. The dashboard shows the same totals: collected, to be collected, and overdue. Totals are kept separate per currency.
+- **Instalments:** for a deposit or payment plan, the form takes one row per instalment (amount and due date). The outstanding balance is their total. The contract lists them in the details table and payment schedule, and `{{payment_summary}}` reads "…payable in N instalments, the final one due by …".
+- **Mark collected:** works per instalment, from the Payments page (next instalment) or the contract page (any instalment). Sales reps can mark their own contracts as collected. Only administrators can undo, and every change is audit-logged.
+- **Delete contract (administrators only):** on a contract's page, under *Delete contract*. You confirm by typing the contract reference. It cancels any open Dropbox Sign request, removes the PDFs, and records the deletion (reference, status and document hashes) in the audit log.
 
 ## How signing works
 

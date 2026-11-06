@@ -1,7 +1,7 @@
 import "server-only";
 import { config, productionBlockers } from "../config";
 import { getStore } from "../db";
-import { findUnfilled } from "../template";
+import { findPlaceholders, findUnfilled } from "../template";
 import { applyDemoSignature, generateContractPdf, type ContractLayout, type DemoSignature } from "../pdf";
 import { signingUrl, parseSigningToken, verifySigningMac } from "../signing-link";
 import * as ds from "../esign/dropbox-sign";
@@ -103,6 +103,10 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
   const fieldValues = await fieldsWithCompany(input, reference, issuedAt.toISOString().slice(0, 10));
   const provider = esignProvider();
 
+  const empty = findPlaceholders(template.body).filter((k) => !["parties", "details_table", "signatures"].includes(k) && !fieldValues[k]);
+  if (empty.length) {
+    throw new UserFacingError(`The template uses ${empty.map((k) => `{{${k}}}`).join(", ")} but no value is set, so the contract wasn't created. Check the company settings in Netlify.`);
+  }
   const { doc, companyImage } = await buildDoc(template.body, fieldValues);
   const { bytes, layout } = await generateContractPdf({
     doc, reference, templateVersion: template.version, issuedAt, companySignatureImage: companyImage,
@@ -128,7 +132,13 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     currency: input.currency,
     paymentStatus: input.paymentStatus,
     paymentSchedule: input.paymentSchedule || null,
-    outstandingBalance: input.outstandingBalance ?? 0,
+    outstandingBalance: input.paymentStatus === "paid_in_full" ? 0 : (input.outstandingBalance ?? 0),
+    balanceDueDate: input.paymentStatus !== "paid_in_full" && input.balanceDueDate ? input.balanceDueDate : null,
+    balanceCollectedAt: null,
+    balanceCollectedBy: null,
+    instalments: input.paymentStatus === "paid_in_full"
+      ? []
+      : input.instalments.map((it) => ({ id: randomToken(6), amount: it.amount, dueDate: it.dueDate, collectedAt: null, collectedBy: null })),
     templateVersionId: template.id,
     fieldValues,
     documentPath: null,
@@ -243,6 +253,62 @@ export async function deleteDraft(user: StaffUser, contract: Contract, meta: Req
   await audit(contract.id, { type: "staff", user }, "contract.draft_deleted", { reference: contract.reference }, meta);
   if (contract.documentPath) await store.deleteFile(contract.documentPath);
   await store.deleteDraft(contract.id);
+}
+
+/**
+ * Records (or undoes) collection of one instalment of a signed contract's balance.
+ * Only the collected fields change; amounts and due dates are contract terms.
+ * `instalmentId` is "balance" for contracts created before instalments existed.
+ */
+export async function setInstalmentCollected(user: StaffUser, contract: Contract, instalmentId: string, collected: boolean, meta: RequestMeta): Promise<Contract> {
+  if (!canAccess(user, contract)) throw new UserFacingError("Contract not found.");
+  if (contract.status !== "signed") throw new UserFacingError("Payments are tracked once the contract is signed.");
+  if (!collected && user.role !== "admin") throw new UserFacingError("Only administrators can undo a recorded payment.");
+  const store = await getStore();
+  const now = new Date().toISOString();
+  let amount: number;
+  let dueDate: string | null;
+  let updated: Contract;
+  if (instalmentId === "balance" && !contract.instalments.length) {
+    if (!(contract.outstandingBalance > 0)) throw new UserFacingError("This contract has no outstanding balance.");
+    amount = contract.outstandingBalance;
+    dueDate = contract.balanceDueDate;
+    updated = await store.updateContract(contract.id, { balanceCollectedAt: collected ? now : null, balanceCollectedBy: collected ? user.id : null });
+  } else {
+    const item = contract.instalments.find((it) => it.id === instalmentId);
+    if (!item) throw new UserFacingError("Instalment not found.");
+    if (!!item.collectedAt === collected) return contract; // already in the requested state
+    amount = item.amount;
+    dueDate = item.dueDate;
+    const instalments = contract.instalments.map((it) =>
+      it.id === instalmentId ? { ...it, collectedAt: collected ? now : null, collectedBy: collected ? user.id : null } : it,
+    );
+    updated = await store.updateContract(contract.id, { instalments });
+  }
+  await audit(contract.id, { type: "staff", user }, collected ? "payment.balance_collected" : "payment.balance_uncollected", {
+    instalmentId, amount, currency: contract.currency, dueDate,
+  }, meta);
+  return updated;
+}
+
+/**
+ * Permanently deletes a contract of any status (administrators only). Stored documents are
+ * removed, any open e-signature request is cancelled, and the deletion is kept in the audit log.
+ */
+export async function adminDeleteContract(admin: StaffUser, contract: Contract, confirmReference: string, meta: RequestMeta) {
+  if (admin.role !== "admin") throw new UserFacingError("Only administrators can delete contracts.");
+  if (confirmReference.trim().toUpperCase() !== contract.reference.toUpperCase()) {
+    throw new UserFacingError(`Type the reference ${contract.reference} to confirm.`);
+  }
+  const store = await getStore();
+  if (contract.esignProvider === "dropbox_sign" && contract.providerRequestId && ["sent", "viewed"].includes(contract.status)) {
+    await ds.cancelSignatureRequest(contract.providerRequestId).catch((e) => console.warn("cancel on delete failed", e));
+  }
+  await audit(contract.id, { type: "staff", user: admin }, "contract.deleted", {
+    reference: contract.reference, status: contract.status, signedAt: contract.signedAt, documentSha256: contract.documentSha256, signedDocumentSha256: contract.signedDocumentSha256,
+  }, meta);
+  for (const p of [contract.documentPath, contract.signedDocumentPath]) if (p) await store.deleteFile(p);
+  await store.adminDeleteContract(contract.id);
 }
 
 // ---------------------------------------------------------------------------------------------

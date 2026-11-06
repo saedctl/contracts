@@ -2,6 +2,8 @@
 
 *Everything you need to build the skills and the evidence.*
 
+This Agreement is entered into between **{{company_name}}**, a company registered in England and Wales under company number {{company_number}}, trading as **"{{business_name}}"** (hereinafter referred to as the **"Academy"**), and **{{customer_name}}** (hereinafter referred to as the **"Member"**).
+
 {{parties}}
 
 {{details_table}}

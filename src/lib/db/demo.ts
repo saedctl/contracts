@@ -163,6 +163,10 @@ export class DemoStore implements Store {
   private decorate(d: DemoData, c: Contract): Contract {
     return {
       ...c,
+      balanceDueDate: c.balanceDueDate ?? null,
+      balanceCollectedAt: c.balanceCollectedAt ?? null,
+      balanceCollectedBy: c.balanceCollectedBy ?? null,
+      instalments: c.instalments ?? [],
       createdByName: d.staff.find((s) => s.id === c.createdBy)?.fullName,
       templateVersion: d.templates.find((t) => t.id === c.templateVersionId)?.version,
     };
@@ -211,6 +215,11 @@ export class DemoStore implements Store {
       const c = d.contracts.find((x) => x.id === id);
       if (!c) return;
       if (c.status !== "draft") throw new Error("Only drafts can be deleted");
+      d.contracts = d.contracts.filter((x) => x.id !== id);
+    });
+  }
+  async adminDeleteContract(id: string) {
+    await this.mutate((d) => {
       d.contracts = d.contracts.filter((x) => x.id !== id);
     });
   }

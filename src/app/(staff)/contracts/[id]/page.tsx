@@ -11,6 +11,10 @@ import { formatDateTime, formatLongDate, formatMoney } from "@/lib/utils";
 import { Alert, ButtonLink, Card, StatusBadge } from "@/components/ui";
 import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 import { ContractActions } from "@/components/contracts/ContractActions";
+import { AdminDeleteContract } from "@/components/contracts/AdminDeleteContract";
+import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
+import { INSTALMENT_STATE_LABELS, PAYMENT_STATE_LABELS, paymentRow } from "@/lib/payments";
+import { todayISO } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Contract" };
 
@@ -90,6 +94,56 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             </dl>
           </Card>
 
+          {c.status === "signed" && !c.anonymisedAt && (() => {
+            const r = paymentRow(c, todayISO());
+            return (
+              <Card className="p-5 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h2 className="font-serif text-lg font-semibold">Payment</h2>
+                  <span className={r.state === "overdue" ? "text-[13px] font-semibold text-red-800" : "text-[13px] font-medium text-muted"}>
+                    {r.state === "overdue" ? `Overdue by ${r.daysOverdue} day${r.daysOverdue === 1 ? "" : "s"}` : PAYMENT_STATE_LABELS[r.state]}
+                  </span>
+                </div>
+                <dl className="mt-4 grid gap-x-6 gap-y-4 text-[14px] sm:grid-cols-3">
+                  <Item label="Collected at signing" value={`${formatMoney(r.collectedAtSigning, c.currency)} on ${formatLongDate(r.collectedOn)}`} />
+                  <Item label="Total collected" value={formatMoney(r.totalCollected, c.currency)} />
+                  <Item label="Still to collect" value={r.outstanding > 0 ? formatMoney(r.outstanding, c.currency) : "Nothing"} />
+                </dl>
+                {r.plan.length > 0 && (
+                  <div className="mt-5 overflow-hidden rounded-xl border border-line">
+                    <table className="w-full text-left text-[14px]">
+                      <thead className="bg-paper/60 text-[12px] uppercase tracking-wide text-muted">
+                        <tr>
+                          <th className="px-4 py-2.5 font-medium">{r.plan.length > 1 ? "Instalment" : "Balance"}</th>
+                          <th className="px-4 py-2.5 font-medium">Due</th>
+                          <th className="px-4 py-2.5 font-medium">Status</th>
+                          <th className="px-4 py-2.5"><span className="sr-only">Action</span></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line">
+                        {r.plan.map((it, i) => (
+                          <tr key={it.id}>
+                            <td className="px-4 py-3 tabular-nums">
+                              <span className="font-medium">{formatMoney(it.amount, c.currency)}</span>
+                              {r.plan.length > 1 && <span className="ml-2 text-[12.5px] text-muted">{i + 1} of {r.plan.length}</span>}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">{it.dueDate ? formatLongDate(it.dueDate) : <span className="text-muted">No date</span>}</td>
+                            <td className={it.state === "overdue" ? "px-4 py-3 font-medium text-red-800" : it.state === "collected" ? "px-4 py-3 text-emerald-800" : "px-4 py-3 text-muted"}>
+                              {it.state === "overdue" ? `Overdue · ${it.daysOverdue} day${it.daysOverdue === 1 ? "" : "s"}` : it.state === "collected" && it.collectedAt ? `Collected ${formatLongDate(it.collectedAt.slice(0, 10))}` : INSTALMENT_STATE_LABELS[it.state]}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <MarkCollectedButton id={c.id} instalmentId={it.id} amount={formatMoney(it.amount, c.currency)} collected={!!it.collectedAt} canUndo={user.role === "admin"} compact />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           {(c.status === "signed" || c.consentAt) && (
             <Card className="p-5 sm:p-6">
               <h2 className="font-serif text-lg font-semibold">Signing evidence</h2>
@@ -155,6 +209,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
               {emails.length === 0 && <li className="text-muted">No emails yet.</li>}
             </ul>
           </Card>
+          {user.role === "admin" && <AdminDeleteContract id={c.id} reference={c.reference} status={c.status} />}
         </div>
       </div>
     </div>
