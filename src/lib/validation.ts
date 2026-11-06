@@ -27,6 +27,7 @@ export const contractInputSchema = z
     paymentStatus: z.enum(PAYMENT_STATUSES, { message: "Choose a payment status" }),
     paymentSchedule: z.string().trim().max(1000, "Payment schedule is too long").optional().default(""),
     outstandingBalance: money("Outstanding balance").optional().default(0),
+    balanceDueDate: z.union([isoDate, z.literal("")]).optional().default(""),
   })
   .superRefine((v, ctx) => {
     if (v.endDate < v.startDate) {

@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth/session";
 import { listContractsForStaff } from "@/lib/services/contracts";
 import { productionBlockers } from "@/lib/config";
 import { findUnfilled } from "@/lib/template";
+import { pickTemplate, tierLabel } from "@/lib/services/templates";
+import { MEMBERSHIP_TIERS } from "@/lib/types";
 import { getStore } from "@/lib/db";
 import { CONTRACT_STATUSES, type ContractStatus } from "@/lib/types";
 import { formatMoney, formatDateTime } from "@/lib/utils";
@@ -17,9 +19,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const q = (sp.q ?? "").slice(0, 100);
   const status = CONTRACT_STATUSES.includes(sp.status as ContractStatus) ? (sp.status as ContractStatus) : undefined;
 
-  const [all, template] = await Promise.all([
+  const [all, activeTemplates] = await Promise.all([
     listContractsForStaff(user, { q: q || undefined }),
-    (await getStore()).getActiveTemplate(),
+    (await getStore()).getActiveTemplates(),
   ]);
   const contracts = status ? all.filter((c) => c.status === status) : all;
   const counts = Object.fromEntries(CONTRACT_STATUSES.map((s) => [s, all.filter((c) => c.status === s).length])) as Record<ContractStatus, number>;
@@ -52,24 +54,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <ul className="mt-1 list-disc pl-5">{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
         </Alert>
       )}
-      {!template && (
-        <Alert tone="warning">
-          No master contract template has been set up.{" "}
-          {isAdmin ? <Link href="/admin/template" className="font-medium underline">Upload your agreement</Link> : "Ask an administrator to upload it."}
-        </Alert>
-      )}
-      {template && findUnfilled(template.body).length > 0 && (
-        <Alert tone="error">
-          The active contract template still contains unfilled items ({findUnfilled(template.body).join(", ")}), so new contracts are blocked.{" "}
-          {isAdmin ? <Link href="/admin/template" className="font-medium underline">Fix the template</Link> : "Ask an administrator to fix the template."}
-        </Alert>
-      )}
-      {template?.isSample && isAdmin && (
-        <Alert>
-          You&apos;re using the <strong>sample template</strong>, which contains no legal terms.{" "}
-          <Link href="/admin/template" className="font-medium underline">Upload your approved agreement</Link> before going live.
-        </Alert>
-      )}
+      {(() => {
+        const perTier = MEMBERSHIP_TIERS.map((t) => ({ t, tpl: pickTemplate(activeTemplates, t) }));
+        const missing = perTier.filter((x) => !x.tpl).map((x) => tierLabel(x.t));
+        const unfilled = perTier.filter((x) => x.tpl && findUnfilled(x.tpl.body).length).map((x) => tierLabel(x.t));
+        const sample = perTier.filter((x) => x.tpl?.isSample).map((x) => tierLabel(x.t));
+        const fix = isAdmin ? <Link href="/admin/template" className="font-medium underline">Open Template</Link> : "Ask an administrator to fix it.";
+        return (
+          <>
+            {missing.length > 0 && <Alert tone="warning">No contract template for {missing.join(" or ")} memberships, so those contracts can&apos;t be created yet. {fix}</Alert>}
+            {unfilled.length > 0 && <Alert tone="error">The {unfilled.join(" and ")} template still contains unfilled items like [ADD: …], so those contracts are blocked. {fix}</Alert>}
+            {sample.length > 0 && isAdmin && <Alert>{sample.join(" and ")} contracts use the <strong>sample template</strong>, which contains no legal terms. {fix} to upload your approved agreement before going live.</Alert>}
+          </>
+        );
+      })()}
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:p-5">

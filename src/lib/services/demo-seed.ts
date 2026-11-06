@@ -36,7 +36,7 @@ export async function seedDemo(store: DemoStore) {
 
   const t = await store.createTemplateVersion({
     title: SAMPLE_TEMPLATE_TITLE, body: SAMPLE_TEMPLATE_BODY, notes: "Demo placeholder — contains no legal terms.",
-    createdBy: admin.id, bodySha256: sha256Hex(SAMPLE_TEMPLATE_BODY), isSample: true,
+    createdBy: admin.id, bodySha256: sha256Hex(SAMPLE_TEMPLATE_BODY), isSample: true, tier: null,
   });
   await store.activateTemplateVersion(t.id);
   await store.setSetting("company_signature", {
@@ -47,7 +47,7 @@ export async function seedDemo(store: DemoStore) {
   const make = (name: string, email: string, amount: number, months: 3 | 6 | 12): ContractInput => ({
     customerName: name, customerEmail: email, customerPhone: "+44 7700 900000", membershipTier: months === 12 ? "vip" : "premium", duration: String(months) as "3",
     startDate: start, endDate: calculateEndDate(start, months), amountPaid: amount, currency: "GBP",
-    paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0,
+    paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0, balanceDueDate: "",
   });
 
   try {

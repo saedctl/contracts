@@ -8,7 +8,7 @@ import { getStore } from "@/lib/db";
 import { requestMeta } from "@/lib/request";
 import { audit } from "@/lib/services/audit";
 import { UserFacingError } from "@/lib/services/contracts";
-import { activateTemplateVersion, createTemplateVersion } from "@/lib/services/templates";
+import { activateTemplateVersion, createTemplateVersion, tierLabel } from "@/lib/services/templates";
 import { STAFF_ROLES } from "@/lib/types";
 
 export type ActionResult = { ok?: boolean; error?: string; message?: string; password?: string };
@@ -33,9 +33,10 @@ export async function saveTemplateAction(_prev: ActionResult, form: FormData): P
       body: String(form.get("body") ?? ""),
       notes: String(form.get("notes") ?? ""),
       activate: true,
+      tier: form.get("tier") === "premium" || form.get("tier") === "vip" ? (form.get("tier") as "premium" | "vip") : null,
     }, await requestMeta());
     revalidatePath("/admin/template");
-    return { ok: true, message: `Saved and activated version ${t.version}. New contracts will use it; existing contracts keep their original version.` };
+    return { ok: true, message: `Saved and activated version ${t.version} for ${tierLabel(t.tier)}. New contracts will use it; existing contracts keep their original version.` };
   } catch (e) {
     return fail(e);
   }

@@ -14,7 +14,7 @@ type Values = {
   customerName: string; customerEmail: string; customerPhone: string;
   membershipTier: MembershipTier | ""; duration: string; startDate: string; endDate: string;
   amountPaid: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
-  paymentSchedule: string; outstandingBalance: string;
+  paymentSchedule: string; outstandingBalance: string; balanceDueDate: string;
 };
 type Preview = { doc: ContractDoc; templateVersion: number; templateTitle: string; isSample: boolean };
 type Sent = { id: string; reference: string; customerEmail: string; emailSimulated: boolean; demo: boolean };
@@ -30,7 +30,7 @@ export function NewContractFlow({ today }: { today: string }) {
   const [v, setV] = useState<Values>({
     customerName: "", customerEmail: "", customerPhone: "",
     membershipTier: "", duration: "", startDate: today, endDate: "",
-    amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "",
+    amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "",
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<{ message: string; contractId?: string } | null>(null);
@@ -52,6 +52,7 @@ export function NewContractFlow({ today }: { today: string }) {
       if (key === "paymentStatus" && value === "paid_in_full") {
         next.outstandingBalance = "";
         next.paymentSchedule = "";
+        next.balanceDueDate = "";
       }
       return next;
     });
@@ -283,7 +284,10 @@ export function NewContractFlow({ today }: { today: string }) {
                     <input id="outstandingBalance" inputMode="decimal" className="field-input pl-8 tabular-nums" value={v.outstandingBalance} onChange={(e) => set("outstandingBalance", e.target.value.replace(/[^\d.]/g, ""))} aria-invalid={!!errors.outstandingBalance} placeholder="0.00" />
                   </div>
                 </Field>
-                <Field label="Payment schedule" htmlFor="paymentSchedule" error={errors.paymentSchedule} hint="Optional — e.g. 3 monthly payments of £200 from 1 Dec" className="sm:col-span-2">
+                <Field label="Balance due date" htmlFor="balanceDueDate" error={errors.balanceDueDate} hint="Optional">
+                  <input id="balanceDueDate" type="date" className="field-input" min={v.startDate} value={v.balanceDueDate} onChange={(e) => set("balanceDueDate", e.target.value)} aria-invalid={!!errors.balanceDueDate} />
+                </Field>
+                <Field label="Payment schedule" htmlFor="paymentSchedule" error={errors.paymentSchedule} hint="Optional — e.g. 3 monthly payments of £200 from 1 Dec">
                   <input id="paymentSchedule" className="field-input" value={v.paymentSchedule} onChange={(e) => set("paymentSchedule", e.target.value)} aria-invalid={!!errors.paymentSchedule} />
                 </Field>
               </div>
@@ -306,7 +310,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div className="text-[14px] leading-6">
               <p className="font-medium">{v.customerName} · <span className="text-muted">{v.customerEmail}</span></p>
-              <p className="text-muted">Template v{preview.templateVersion} · Highlighted text is filled in from the details you entered.</p>
+              <p className="text-muted">Using “{preview.templateTitle}” (v{preview.templateVersion}) · Highlighted text is filled in from the details you entered.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setStep("details")} disabled={!!busy}>Edit details</Button>
@@ -342,7 +346,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <p className="mt-3 text-[13px] text-muted">Reference {sent.reference}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <ButtonLink href={`/contracts/${sent.id}`} variant="secondary">View contract</ButtonLink>
-            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "" })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
+            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "" })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
           </div>
         </Card>
       )}

@@ -9,7 +9,8 @@ import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 
 const EXAMPLES: Record<string, string> = Object.fromEntries(PLACEHOLDERS.map((p) => [p.key, p.example]));
 
-export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampleBody, companySignatory, legalName }: {
+export function TemplateEditor({ tier, initialTitle, initialBody, activeVersion, sampleBody, companySignatory, legalName }: {
+  tier: "premium" | "vip" | null;
   initialTitle: string;
   initialBody: string;
   activeVersion: number | null;
@@ -26,12 +27,12 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
   const check = useMemo(() => checkTemplate(body), [body]);
   const doc = useMemo(() => {
     if (tab !== "preview") return null;
-    const values: Record<string, string> = { ...EXAMPLES, company_name: legalName };
+    const values: Record<string, string> = { ...EXAMPLES, company_name: legalName, ...(tier ? { membership_tier: tier === "vip" ? "VIP" : "Premium" } : {}) };
     return buildContractDoc(body, values, {
       client: { name: values.customer_name, status: "pending" },
       company: companySignatory ? { name: companySignatory.name, role: companySignatory.role, appliedOn: values.contract_date, image: companySignatory.image ?? undefined } : null,
     });
-  }, [tab, body, companySignatory, legalName]);
+  }, [tab, body, companySignatory, legalName, tier]);
 
   function insert(key: string) {
     const el = area.current;
@@ -67,6 +68,7 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
 
   return (
     <form action={action} className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <input type="hidden" name="tier" value={tier ?? ""} />
       <Card className="p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <Field label="Version name" htmlFor="title" className="flex-1">
@@ -124,7 +126,7 @@ export function TemplateEditor({ initialTitle, initialBody, activeVersion, sampl
         {state.ok && <Alert tone="success" className="mt-5">{state.message}</Alert>}
 
         <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[13px] text-muted">{activeVersion ? `Currently active: v${activeVersion}. ` : ""}Saving creates v{(activeVersion ?? 0) + 1} and makes it active.</p>
+          <p className="text-[13px] text-muted">{activeVersion ? `Currently active here: v${activeVersion}. ` : ""}Saving creates a new version and makes it active for this tab.</p>
           <Button type="submit" disabled={pending || !body.trim() || check.unknown.length > 0 || check.unfilled.length > 0}>{pending && <Spinner />} Save new version</Button>
         </div>
       </Card>

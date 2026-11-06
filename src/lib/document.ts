@@ -49,10 +49,11 @@ export function detailRows(v: Record<string, string>): DetailRow[] {
   ];
   if (v.membership_tier) rows.push({ label: "Membership tier", value: v.membership_tier });
   rows.push({ label: "Membership period", value: `${v.membership_start_date} – ${v.membership_end_date} (${v.membership_duration})` });
-  rows.push({ label: "Amount paid", value: v.amount_paid });
+  rows.push({ label: "Amount collected", value: v.contract_date ? `${v.amount_paid} on ${v.contract_date}` : v.amount_paid });
   rows.push({ label: "Payment status", value: v.payment_status });
   if (v.payment_status !== "Paid in Full") {
-    rows.push({ label: "Outstanding balance", value: v.outstanding_balance });
+    const due = v.balance_due_date && v.balance_due_date !== "Not applicable" ? ` due ${v.balance_due_date}` : "";
+    rows.push({ label: "Deferred balance", value: `${v.outstanding_balance}${due}` });
     if (v.payment_schedule && v.payment_schedule !== "Not applicable") rows.push({ label: "Payment schedule", value: v.payment_schedule });
   }
   return rows.filter((r) => r.value);

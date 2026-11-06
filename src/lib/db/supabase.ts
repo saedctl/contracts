@@ -91,11 +91,11 @@ export class SupabaseStore implements Store {
 
   // ---- templates ----
   private mapTemplate(row: Row): TemplateVersion {
-    return camelRow<TemplateVersion>(row);
+    const t = camelRow<TemplateVersion>(row);
+    return { ...t, tier: t.tier ?? null };
   }
-  async getActiveTemplate() {
-    const row = check(await this.db.from("template_versions").select("*").eq("is_active", true).maybeSingle());
-    return row ? this.mapTemplate(row) : null;
+  async getActiveTemplates() {
+    return check(await this.db.from("template_versions").select("*").eq("is_active", true)).map((r) => this.mapTemplate(r));
   }
   async getTemplateVersion(id: string) {
     const row = check(await this.db.from("template_versions").select("*").eq("id", id).maybeSingle());
@@ -104,10 +104,10 @@ export class SupabaseStore implements Store {
   async listTemplateVersions() {
     return check(await this.db.from("template_versions").select("*").order("version", { ascending: false })).map((r) => this.mapTemplate(r));
   }
-  async createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string }) {
+  async createTemplateVersion(input: { title: string; body: string; notes: string | null; createdBy: string; bodySha256: string; tier: TemplateVersion["tier"] }) {
     const row = check(
       await this.db.rpc("create_template_version", {
-        p_title: input.title, p_body: input.body, p_notes: input.notes, p_created_by: input.createdBy, p_body_sha256: input.bodySha256,
+        p_title: input.title, p_body: input.body, p_notes: input.notes, p_created_by: input.createdBy, p_body_sha256: input.bodySha256, p_tier: input.tier,
       }).single(),
     );
     return this.mapTemplate(row as unknown as Row);
