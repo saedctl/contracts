@@ -82,7 +82,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             <dl className="mt-4 grid gap-x-6 gap-y-4 text-[14px] sm:grid-cols-2">
               <Item label="Email" value={c.customerEmail} />
               <Item label="Phone" value={c.customerPhone} />
-              <Item label="Membership" value={`${formatLongDate(c.startDate)} – ${formatLongDate(c.endDate)}`} />
+              <Item label="Membership" value={c.endDate ? `${formatLongDate(c.startDate)} – ${formatLongDate(c.endDate)}` : `From ${formatLongDate(c.startDate)} (lifetime)`} />
               <Item label="Duration" value={c.durationLabel} />
               <Item label="Amount paid" value={formatMoney(c.amountPaid, c.currency)} />
               <Item label="Payment status" value={PAYMENT_STATUS_LABELS[c.paymentStatus]} />

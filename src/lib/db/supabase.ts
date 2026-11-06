@@ -46,6 +46,7 @@ const CONTRACT_SELECT = "*, creator:profiles!contracts_created_by_fkey(full_name
 function migrationHint(message: string): string | null {
   if (/balance_(due_date|collected)|instalments|admin_delete_contract/.test(message)) return "0003_payments.sql";
   if (/create_template_version|activate_template_version|app_settings|p_tier|column .*tier|tier.* does not exist/.test(message)) return "0002_settings.sql";
+  if (/"end_date".*not-null|null value in column "end_date"/.test(message)) return "0004_lifetime.sql";
   return null;
 }
 

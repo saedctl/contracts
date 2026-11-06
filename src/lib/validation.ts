@@ -19,9 +19,10 @@ export const contractInputSchema = z
       .trim()
       .regex(/^\+?[\d\s().-]{7,24}$/, "Enter a valid phone number, e.g. +44 7700 900123"),
     membershipTier: z.enum(MEMBERSHIP_TIERS, { message: "Choose a membership tier" }),
-    duration: z.enum(["1", "3", "6", "12", "custom"], { message: "Choose a membership duration" }),
+    duration: z.enum(["1", "3", "6", "12", "lifetime", "custom"], { message: "Choose a membership duration" }),
     startDate: isoDate,
-    endDate: isoDate,
+    /** Empty for a lifetime membership. */
+    endDate: z.union([isoDate, z.literal("")]).optional().default(""),
     amountPaid: money("Amount paid"),
     currency: z.enum(CURRENCIES),
     paymentStatus: z.enum(PAYMENT_STATUSES, { message: "Choose a payment status" }),
@@ -36,12 +37,15 @@ export const contractInputSchema = z
       .default([]),
   })
   .superRefine((v, ctx) => {
-    if (v.endDate < v.startDate) {
+    if (v.duration !== "lifetime" && !v.endDate) {
+      ctx.addIssue({ code: "custom", path: ["endDate"], message: "Enter a valid date" });
+    }
+    if (v.duration !== "lifetime" && v.endDate && v.endDate < v.startDate) {
       ctx.addIssue({ code: "custom", path: ["endDate"], message: "End date must be on or after the start date" });
     }
     const max = new Date(v.startDate);
     max.setUTCFullYear(max.getUTCFullYear() + 5);
-    if (new Date(v.endDate) > max) {
+    if (v.duration !== "lifetime" && v.endDate && new Date(v.endDate) > max) {
       ctx.addIssue({ code: "custom", path: ["endDate"], message: "Membership cannot be longer than 5 years" });
     }
     if (v.paymentStatus !== "paid_in_full") {
@@ -60,6 +64,7 @@ export const contractInputSchema = z
       });
     }
   })
+  .transform((v) => (v.duration === "lifetime" ? { ...v, endDate: "" } : v))
   .transform((v) => {
     if (v.paymentStatus === "paid_in_full") return { ...v, instalments: [], outstandingBalance: 0, balanceDueDate: "" };
     if (v.instalments.length === 0) return v;

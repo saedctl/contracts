@@ -51,5 +51,6 @@ export const DURATION_OPTIONS = [
   { value: "3", label: "3 months" },
   { value: "6", label: "6 months" },
   { value: "12", label: "12 months" },
+  { value: "lifetime", label: "Lifetime" },
   { value: "custom", label: "Custom" },
 ] as const;

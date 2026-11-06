@@ -114,8 +114,9 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
   });
   const documentSha256 = sha256Hex(bytes);
 
-  const retention = new Date(input.endDate);
-  retention.setUTCFullYear(retention.getUTCFullYear() + config.retentionYears);
+  // Lifetime memberships never end, so their records are kept (no retention date).
+  const retention = input.endDate ? new Date(input.endDate) : null;
+  retention?.setUTCFullYear(retention.getUTCFullYear() + config.retentionYears);
 
   const contract = await store.insertContract({
     reference,
@@ -124,10 +125,10 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     customerPhone: input.customerPhone,
-    durationMonths: input.duration === "custom" ? null : Number(input.duration),
+    durationMonths: input.duration === "custom" || input.duration === "lifetime" ? null : Number(input.duration),
     durationLabel: fieldValues.membership_duration,
     startDate: input.startDate,
-    endDate: input.endDate,
+    endDate: input.endDate || null,
     amountPaid: input.amountPaid,
     currency: input.currency,
     paymentStatus: input.paymentStatus,
@@ -158,7 +159,7 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     declinedAt: null,
     confirmationSentAt: null,
     isDemo: provider === "demo",
-    retentionUntil: retention.toISOString().slice(0, 10),
+    retentionUntil: retention ? retention.toISOString().slice(0, 10) : null,
     anonymisedAt: null,
   });
 

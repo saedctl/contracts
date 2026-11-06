@@ -70,7 +70,8 @@ export interface Contract {
   durationMonths: number | null;
   durationLabel: string;
   startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  /** YYYY-MM-DD; null for a lifetime membership. */
+  endDate: string | null;
   amountPaid: number;
   currency: Currency;
   paymentStatus: PaymentStatus;
