@@ -30,7 +30,7 @@ export interface ContractDoc {
   brand: string;
   title: string;
   tagline: string | null;
-  provider: { legalName: string; tradingAs: string };
+  provider: { legalName: string; tradingAs: string; companyNumber?: string };
   client: { name: string };
   details: DetailRow[];
   /** Template body in order, with section markers where generated sections go. */
@@ -94,7 +94,7 @@ export function buildContractDoc(
     brand: values.business_name || "The Engineers Club",
     title,
     tagline,
-    provider: { legalName: values.company_name, tradingAs: values.business_name },
+    provider: { legalName: values.company_name, tradingAs: values.business_name, companyNumber: values.company_number || undefined },
     client: { name: values.customer_name },
     details: detailRows(values),
     body,

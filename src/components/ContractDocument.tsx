@@ -32,6 +32,7 @@ function Parties({ doc }: { doc: ContractDoc }) {
         <p>
           <strong>{doc.provider.legalName}</strong> trading as <em>“{doc.provider.tradingAs}”</em>
         </p>
+        {doc.provider.companyNumber && <p className="text-[13.5px] text-muted">Company no. {doc.provider.companyNumber} · England and Wales</p>}
       </div>
       <div>
         <p className="doc-label">The Client</p>

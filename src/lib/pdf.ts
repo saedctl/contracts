@@ -304,12 +304,13 @@ export async function generateContractPdf(opts: GenerateOptions): Promise<{ byte
   w.y -= 6;
   w.page.drawLine({ start: { x: MARGIN_X, y: w.y }, end: { x: A4[0] - MARGIN_X, y: w.y }, thickness: 1.6, color: INK });
   w.y -= 26;
+  let directlyAfterTitle = true;
 
   // ---- Sections ----
   const label = (page: PDFPage, text: string, x: number, y: number) =>
     page.drawText(text.toUpperCase(), { x, y, size: 7.5, font: fonts.sansBold, color: MUTED });
 
-  const drawParties = () => {
+  const drawParties = (afterTitle: boolean) => {
     const colW = (CONTENT_W - 24) / 2;
     const left = wrap(toPieces([
       { text: doc.provider.legalName, bold: true, italic: false },
@@ -317,11 +318,17 @@ export async function generateContractPdf(opts: GenerateOptions): Promise<{ byte
       { text: `“${doc.provider.tradingAs}”`, bold: false, italic: true },
     ], fonts, BODY.size), colW);
     const right = wrap(toPieces([{ text: doc.client.name, bold: true, italic: false }], fonts, BODY.size), colW);
-    w.ensure(20 + Math.max(left.length, right.length) * 15 + 20);
+    w.ensure(34 + Math.max(left.length, right.length) * 15 + 34);
+    // Room above the labels when the section follows body text (e.g. an opening clause).
+    if (!afterTitle) w.y -= 14;
     label(w.page, "The Provider", MARGIN_X, w.y);
     label(w.page, "The Client", MARGIN_X + colW + 24, w.y);
     let yl = w.y - 6;
     for (const l of left) { yl -= 15; drawLine(w.page, l, MARGIN_X, yl); }
+    if (doc.provider.companyNumber) {
+      yl -= 13;
+      w.page.drawText(`Company no. ${doc.provider.companyNumber} · England and Wales`, { x: MARGIN_X, y: yl, size: 8.5, font: fonts.serif, color: MUTED });
+    }
     let yr = w.y - 6;
     for (const l of right) { yr -= 15; drawLine(w.page, l, MARGIN_X + colW + 24, yr); }
     w.y = Math.min(yl, yr) - 22;
@@ -408,8 +415,10 @@ export async function generateContractPdf(opts: GenerateOptions): Promise<{ byte
   } as const;
 
   for (const block of doc.body as RenderedBlock[]) {
+    const first = directlyAfterTitle;
+    directlyAfterTitle = false;
     if (block.type === "section") {
-      if (block.key === "parties") drawParties();
+      if (block.key === "parties") drawParties(first);
       else if (block.key === "details_table") drawDetails();
       else drawSignatures();
       continue;

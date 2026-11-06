@@ -37,6 +37,7 @@ export function buildFieldValues(input: ContractInput, reference: string, issued
     contract_reference: reference,
     contract_date: formatLongDate(issuedOn),
     company_name: BRAND.legalName,
+    company_number: BRAND.companyNumber,
     business_name: BRAND.name,
     community_url: BRAND.website,
   };

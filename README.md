@@ -112,7 +112,7 @@ Every save creates a new, immutable version. A contract records the version it w
 
 - **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor. It enables app settings and per-tier templates, and is safe to run again.
 - **Company signature:** go to **Template → Company signature**, enter the signatory (e.g. Saed Farah) and optionally upload a signature image. It is auto-applied to every new contract and dated on the day the contract is issued. Contracts already issued keep the signature they were created with.
-- **Legal entity:** set `COMPANY_LEGAL_NAME` if the contracting company isn't Harbor Security Ltd.
+- **Legal entity:** contracts are issued by Harbor Security Ltd (company number 17242789), trading as The Engineers Club. Placeholders are `{{company_name}}` and `{{company_number}}`; override them with `COMPANY_LEGAL_NAME` / `COMPANY_NUMBER` only if this changes. A contract is never created if a placeholder it uses has no value.
 - **Document layout:**
   - The first `# heading` becomes the centred title, and an `*italic*` line right below it becomes the tagline.
   - The Provider/Client section and the details table are added at the top automatically, and the signature block at the end. To place them yourself, put `{{parties}}`, `{{details_table}}` or `{{signatures}}` on a line of their own.

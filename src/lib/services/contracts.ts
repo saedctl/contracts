@@ -1,7 +1,7 @@
 import "server-only";
 import { config, productionBlockers } from "../config";
 import { getStore } from "../db";
-import { findUnfilled } from "../template";
+import { findPlaceholders, findUnfilled } from "../template";
 import { applyDemoSignature, generateContractPdf, type ContractLayout, type DemoSignature } from "../pdf";
 import { signingUrl, parseSigningToken, verifySigningMac } from "../signing-link";
 import * as ds from "../esign/dropbox-sign";
@@ -103,6 +103,10 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
   const fieldValues = await fieldsWithCompany(input, reference, issuedAt.toISOString().slice(0, 10));
   const provider = esignProvider();
 
+  const empty = findPlaceholders(template.body).filter((k) => !["parties", "details_table", "signatures"].includes(k) && !fieldValues[k]);
+  if (empty.length) {
+    throw new UserFacingError(`The template uses ${empty.map((k) => `{{${k}}}`).join(", ")} but no value is set, so the contract wasn't created. Check the company settings in Netlify.`);
+  }
   const { doc, companyImage } = await buildDoc(template.body, fieldValues);
   const { bytes, layout } = await generateContractPdf({
     doc, reference, templateVersion: template.version, issuedAt, companySignatureImage: companyImage,
