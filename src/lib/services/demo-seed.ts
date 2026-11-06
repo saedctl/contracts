@@ -8,7 +8,8 @@ import { SAMPLE_TEMPLATE_BODY, SAMPLE_TEMPLATE_TITLE } from "../sample-template"
 import { calculateEndDate } from "../dates";
 import { sha256Hex, todayISO } from "../utils";
 import type { ContractInput } from "../validation";
-import { completeDemoSignature, createContract, sendContract, startSigning } from "./contracts";
+import { completeDemoSignature, createContract, sendContract, setInstalmentCollected, startSigning } from "./contracts";
+import type { Contract, StaffUser } from "../types";
 
 const seedMeta = { ip: "127.0.0.1", userAgent: "demo-seed" };
 
@@ -43,11 +44,21 @@ export async function seedDemo(store: DemoStore) {
     enabled: true, name: "Saed Farah", role: "For The Engineers Club", imagePath: null, imageType: null, updatedAt: new Date().toISOString(),
   });
 
+  // If the business's Premium agreement is in the repo, use it for Premium contracts.
+  try {
+    const premiumBody = await fs.readFile(path.join(process.cwd(), "templates", "premium-membership-agreement.md"), "utf8");
+    const premium = await store.createTemplateVersion({
+      title: "Premium Membership Agreement", body: premiumBody, notes: "Demo copy of the Premium agreement",
+      createdBy: admin.id, bodySha256: sha256Hex(premiumBody), tier: "premium",
+    });
+    await store.activateTemplateVersion(premium.id);
+  } catch {}
+
   const start = todayISO();
   const make = (name: string, email: string, amount: number, months: 3 | 6 | 12): ContractInput => ({
     customerName: name, customerEmail: email, customerPhone: "+44 7700 900000", membershipTier: months === 12 ? "vip" : "premium", duration: String(months) as "3",
     startDate: start, endDate: calculateEndDate(start, months), amountPaid: amount, currency: "GBP",
-    paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0, balanceDueDate: "",
+    paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0, balanceDueDate: "", instalments: [],
   });
 
   try {
@@ -60,6 +71,24 @@ export async function seedDemo(store: DemoStore) {
     await sendContract(sales, sarah, seedMeta);
 
     await createContract(sales, make("Michael Jones", "michael.jones@example.com", 299, 3), seedMeta);
+
+    // Signed members on payment plans, so the Payments page has something to show.
+    const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+    const signPlan = async (name: string, email: string, paid: number, plan: [number, number][], collectFirst: number) => {
+      const input: ContractInput = {
+        ...make(name, email, paid, 12), membershipTier: "premium", startDate: day(-45), endDate: calculateEndDate(day(-45), 12),
+        paymentStatus: "payment_plan", instalments: plan.map(([amount, offset]) => ({ amount, dueDate: day(offset) })),
+        outstandingBalance: plan.reduce((a, [amt]) => a + amt, 0), balanceDueDate: day(plan[plan.length - 1][1]),
+      };
+      const c = await createContract(sales, input, seedMeta);
+      await startSigning(await sendContract(sales, c, seedMeta), seedMeta);
+      await completeDemoSignature((await store.getContract(c.id))!, { kind: "type", typedName: name }, seedMeta);
+      let signed = (await store.getContract(c.id)) as Contract;
+      for (const it of signed.instalments.slice(0, collectFirst)) signed = await setInstalmentCollected(sales as StaffUser, signed, it.id, true, seedMeta);
+    };
+    await signPlan("Abdulfattah Abdi", "abdulfattah@example.com", 1500, [[1300, 24]], 0);
+    await signPlan("Amira Hassan", "amira.hassan@example.com", 1000, [[600, -30], [600, -6], [600, 24]], 1);
+    await signPlan("Daniel Okafor", "daniel.okafor@example.com", 800, [[1000, -14], [1000, 16]], 2);
   } catch (e) {
     console.error("Demo seed: could not create example contracts", e);
   }

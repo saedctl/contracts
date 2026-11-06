@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth/session";
 import { listContractsForStaff } from "@/lib/services/contracts";
 import { PAYMENT_STATE_LABELS, paymentRow, paymentTotals, sortPaymentRows, type PaymentRow, type PaymentState } from "@/lib/payments";
-import { formatLongDate, formatMoney, todayISO } from "@/lib/utils";
+import { formatMoney, formatShortDate, todayISO } from "@/lib/utils";
 import { Card, cx } from "@/components/ui";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
@@ -66,7 +66,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       <div>
         <p className="eyebrow">{isAdmin ? "All signed contracts" : "Your signed contracts"}</p>
         <h1 className="mt-2 font-serif text-[28px] font-semibold leading-tight sm:text-[32px]">Payments</h1>
-        <p className="mt-2 max-w-2xl text-[15px] leading-6 text-muted">Cash collected and still to collect on signed contracts. Mark a balance as collected once the money arrives.</p>
+        <p className="mt-2 max-w-2xl text-[15px] leading-6 text-muted">Cash collected and still to collect on signed contracts. Mark each payment as collected once the money arrives; the full plan is on each contract&apos;s page.</p>
       </div>
 
       <PaymentSummary totals={totals} />
@@ -110,7 +110,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                   <th className="px-5 py-3 font-medium">Member</th>
                   <th className="px-5 py-3 font-medium">Collected</th>
                   <th className="whitespace-nowrap px-5 py-3 font-medium">To collect</th>
-                  <th className="px-5 py-3 font-medium">Due</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">Next due</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3"><span className="sr-only">Actions</span></th>
                 </tr>
@@ -126,17 +126,33 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                         <div className="text-[12.5px] text-muted">{c.reference}{c.fieldValues.membership_tier ? ` · ${c.fieldValues.membership_tier}` : ""}{isAdmin && c.createdByName ? ` · ${c.createdByName}` : ""}</div>
                       </td>
                       <td className="px-5 py-4 tabular-nums">
-                        <div className="font-medium">{formatMoney(r.collectedAtSigning, c.currency)}</div>
-                        <div className="text-[13px] text-muted">on {formatLongDate(r.collectedOn)}</div>
-                        {r.state === "collected" && r.balanceCollectedOn && (
-                          <div className="mt-1 text-[13px] text-muted">+ {formatMoney(r.balance, c.currency)} on {formatLongDate(r.balanceCollectedOn)}</div>
+                        <div className="font-medium">{formatMoney(r.totalCollected, c.currency)}</div>
+                        <div className="text-[13px] text-muted">{formatMoney(r.collectedAtSigning, c.currency)} on {formatShortDate(r.collectedOn)}</div>
+                        {r.paidCount > 0 && r.lastCollectedOn && (
+                          <div className="text-[13px] text-muted">+ {r.plan.length > 1 ? `${r.paidCount} instalment${r.paidCount === 1 ? "" : "s"}` : "balance"}, last {formatShortDate(r.lastCollectedOn)}</div>
                         )}
                       </td>
-                      <td className="px-5 py-4 tabular-nums font-medium">{r.outstanding > 0 ? formatMoney(r.outstanding, c.currency) : <span className="text-muted">—</span>}</td>
-                      <td className="px-5 py-4 whitespace-nowrap">{r.outstanding > 0 ? (r.dueDate ? formatLongDate(r.dueDate) : <span className="text-muted">No date set</span>) : <span className="text-muted">—</span>}</td>
+                      <td className="px-5 py-4 tabular-nums">
+                        {r.outstanding > 0 ? (
+                          <>
+                            <div className="font-medium">{formatMoney(r.outstanding, c.currency)}</div>
+                            {r.plan.length > 1 && <div className="text-[13px] text-muted">{r.paidCount} of {r.plan.length} instalments paid</div>}
+                          </>
+                        ) : <span className="text-muted">—</span>}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {r.next ? (
+                          <>
+                            <div>{r.next.dueDate ? formatShortDate(r.next.dueDate) : <span className="text-muted">No date set</span>}</div>
+                            {r.plan.length > 1 && <div className="text-[13px] text-muted">{formatMoney(r.next.amount, c.currency)} next</div>}
+                          </>
+                        ) : <span className="text-muted">—</span>}
+                      </td>
                       <td className="px-5 py-4"><StateBadge row={r} /></td>
                       <td className="px-5 py-4 text-right">
-                        {r.balance > 0 && <MarkCollectedButton id={c.id} amount={formatMoney(r.balance, c.currency)} collected={r.state === "collected"} canUndo={isAdmin} compact />}
+                        {r.next && (
+                          <MarkCollectedButton id={c.id} instalmentId={r.next.id} amount={formatMoney(r.next.amount, c.currency)} collected={false} canUndo={isAdmin} compact label={r.plan.length > 1 ? `Mark ${formatMoney(r.next.amount, c.currency)} collected` : "Mark collected"} />
+                        )}
                       </td>
                     </tr>
                   );
@@ -158,10 +174,13 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     </div>
                     <dl className="grid grid-cols-2 gap-2 text-[13.5px]">
                       <div><dt className="text-muted">Collected</dt><dd className="font-medium tabular-nums">{formatMoney(r.totalCollected, c.currency)}</dd></div>
-                      <div><dt className="text-muted">To collect</dt><dd className="font-medium tabular-nums">{r.outstanding > 0 ? `${formatMoney(r.outstanding, c.currency)}${r.dueDate ? ` · ${formatLongDate(r.dueDate)}` : ""}` : "—"}</dd></div>
+                      <div><dt className="text-muted">To collect</dt><dd className="font-medium tabular-nums">{r.outstanding > 0 ? formatMoney(r.outstanding, c.currency) : "—"}</dd></div>
+                      {r.next && <div className="col-span-2"><dt className="text-muted">Next due</dt><dd className="tabular-nums">{formatMoney(r.next.amount, c.currency)}{r.next.dueDate ? ` on ${formatShortDate(r.next.dueDate)}` : ""}{r.plan.length > 1 ? ` · ${r.paidCount} of ${r.plan.length} paid` : ""}</dd></div>}
                     </dl>
-                    {r.balance > 0 && (
-                      <div className="flex justify-end"><MarkCollectedButton id={c.id} amount={formatMoney(r.balance, c.currency)} collected={r.state === "collected"} canUndo={isAdmin} compact /></div>
+                    {r.next && (
+                      <div className="flex justify-end">
+                        <MarkCollectedButton id={c.id} instalmentId={r.next.id} amount={formatMoney(r.next.amount, c.currency)} collected={false} canUndo={isAdmin} compact label={r.plan.length > 1 ? `Mark ${formatMoney(r.next.amount, c.currency)} collected` : "Mark collected"} />
+                      </div>
                     )}
                   </li>
                 );

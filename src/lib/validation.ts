@@ -28,6 +28,12 @@ export const contractInputSchema = z
     paymentSchedule: z.string().trim().max(1000, "Payment schedule is too long").optional().default(""),
     outstandingBalance: money("Outstanding balance").optional().default(0),
     balanceDueDate: z.union([isoDate, z.literal("")]).optional().default(""),
+    /** Payment plan for the balance. When given, it defines the outstanding balance and due date. */
+    instalments: z
+      .array(z.object({ amount: money("Instalment amount"), dueDate: isoDate }))
+      .max(24, "Use at most 24 instalments")
+      .optional()
+      .default([]),
   })
   .superRefine((v, ctx) => {
     if (v.endDate < v.startDate) {
@@ -38,6 +44,14 @@ export const contractInputSchema = z
     if (new Date(v.endDate) > max) {
       ctx.addIssue({ code: "custom", path: ["endDate"], message: "Membership cannot be longer than 5 years" });
     }
+    if (v.paymentStatus !== "paid_in_full") {
+      if (v.instalments.length === 0 && !(v.outstandingBalance > 0)) {
+        ctx.addIssue({ code: "custom", path: ["instalments"], message: "Add at least one instalment for the balance still to be paid" });
+      }
+      v.instalments.forEach((it, i) => {
+        if (!(it.amount > 0)) ctx.addIssue({ code: "custom", path: ["instalments", i, "amount"], message: "Enter an amount" });
+      });
+    }
     if (v.paymentStatus === "paid_in_full" && v.outstandingBalance > 0) {
       ctx.addIssue({
         code: "custom",
@@ -45,6 +59,14 @@ export const contractInputSchema = z
         message: "Outstanding balance should be 0 when the membership is paid in full",
       });
     }
+  })
+  .transform((v) => {
+    if (v.paymentStatus === "paid_in_full") return { ...v, instalments: [], outstandingBalance: 0, balanceDueDate: "" };
+    if (v.instalments.length === 0) return v;
+    // The instalments are the source of truth for the balance and its final due date.
+    const instalments = [...v.instalments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const total = Math.round(instalments.reduce((sum, it) => sum + it.amount, 0) * 100) / 100;
+    return { ...v, instalments, outstandingBalance: total, balanceDueDate: instalments[instalments.length - 1].dueDate };
   });
 
 export type ContractInput = z.infer<typeof contractInputSchema>;

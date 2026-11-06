@@ -52,7 +52,8 @@ export function detailRows(v: Record<string, string>): DetailRow[] {
   rows.push({ label: "Amount collected", value: v.contract_date ? `${v.amount_paid} on ${v.contract_date}` : v.amount_paid });
   rows.push({ label: "Payment status", value: v.payment_status });
   if (v.payment_status !== "Paid in Full") {
-    const due = v.balance_due_date && v.balance_due_date !== "Not applicable" ? ` due ${v.balance_due_date}` : "";
+    const n = Number(v.instalment_count || 0);
+    const due = n > 1 ? ` in ${n} instalments` : v.balance_due_date && v.balance_due_date !== "Not applicable" ? ` due ${v.balance_due_date}` : "";
     rows.push({ label: "Deferred balance", value: `${v.outstanding_balance}${due}` });
     if (v.payment_schedule && v.payment_schedule !== "Not applicable") rows.push({ label: "Payment schedule", value: v.payment_schedule });
   }

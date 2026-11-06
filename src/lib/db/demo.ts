@@ -166,6 +166,7 @@ export class DemoStore implements Store {
       balanceDueDate: c.balanceDueDate ?? null,
       balanceCollectedAt: c.balanceCollectedAt ?? null,
       balanceCollectedBy: c.balanceCollectedBy ?? null,
+      instalments: c.instalments ?? [],
       createdByName: d.staff.find((s) => s.id === c.createdBy)?.fullName,
       templateVersion: d.templates.find((t) => t.id === c.templateVersionId)?.version,
     };

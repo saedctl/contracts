@@ -75,4 +75,6 @@ export const POST_SIGNATURE_MUTABLE: (keyof ContractPatch)[] = [
   // Payment bookkeeping, not contract terms.
   "balanceCollectedAt",
   "balanceCollectedBy",
+  // Only instalments' collected fields change after signing (enforced in services/contracts).
+  "instalments",
 ];

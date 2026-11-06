@@ -125,7 +125,8 @@ Every save creates a new, immutable version. A contract records the version it w
 
 - **Database setup:** run [`supabase/migrations/0003_payments.sql`](supabase/migrations/0003_payments.sql) in the Supabase SQL Editor (safe to re-run).
 - **Payments page:** lists signed contracts with cash collected (amount and date) and cash to be collected (amount and due date) against each member. The dashboard shows the same totals: collected, to be collected, and overdue. Totals are kept separate per currency.
-- **Mark collected:** records that a balance has arrived. Sales reps can mark their own contracts. Only administrators can undo it. Both actions are audit-logged.
+- **Instalments:** for a deposit or payment plan, the form takes one row per instalment (amount and due date). The outstanding balance is their total. The contract lists them in the details table and payment schedule, and `{{payment_summary}}` reads "…payable in N instalments, the final one due by …".
+- **Mark collected:** works per instalment, from the Payments page (next instalment) or the contract page (any instalment). Sales reps can mark their own contracts as collected. Only administrators can undo, and every change is audit-logged.
 - **Delete contract (administrators only):** on a contract's page, under *Delete contract*. You confirm by typing the contract reference. It cancels any open Dropbox Sign request, removes the PDFs, and records the deletion (reference, status and document hashes) in the audit log.
 
 ## How signing works

@@ -15,9 +15,19 @@ type Values = {
   membershipTier: MembershipTier | ""; duration: string; startDate: string; endDate: string;
   amountPaid: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
   paymentSchedule: string; outstandingBalance: string; balanceDueDate: string;
+  instalments: { amount: string; dueDate: string }[];
 };
 type Preview = { doc: ContractDoc; templateVersion: number; templateTitle: string; isSample: boolean };
 type Sent = { id: string; reference: string; customerEmail: string; emailSimulated: boolean; demo: boolean };
+
+/** Same day next month (clamped to month end), for quickly adding monthly instalments. */
+function nextMonth(iso?: string): string {
+  if (!iso) return "";
+  const end = calculateEndDate(iso, 1); // day before the same date next month
+  const d = new Date(end + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "details", label: "Enter details" },
@@ -31,6 +41,7 @@ export function NewContractFlow({ today }: { today: string }) {
     customerName: "", customerEmail: "", customerPhone: "",
     membershipTier: "", duration: "", startDate: today, endDate: "",
     amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "",
+    instalments: [],
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<{ message: string; contractId?: string } | null>(null);
@@ -53,6 +64,10 @@ export function NewContractFlow({ today }: { today: string }) {
         next.outstandingBalance = "";
         next.paymentSchedule = "";
         next.balanceDueDate = "";
+        next.instalments = [];
+      }
+      if (key === "paymentStatus" && value !== "paid_in_full" && next.instalments.length === 0) {
+        next.instalments = [{ amount: "", dueDate: "" }];
       }
       return next;
     });
@@ -69,7 +84,9 @@ export function NewContractFlow({ today }: { today: string }) {
     const result = contractInputSchema.safeParse({
       ...v,
       amountPaid: v.amountPaid === "" ? undefined : v.amountPaid,
-      outstandingBalance: v.outstandingBalance === "" ? 0 : v.outstandingBalance,
+      outstandingBalance: 0,
+      balanceDueDate: "",
+      instalments: v.paymentStatus === "paid_in_full" ? [] : v.instalments.map((it) => ({ amount: it.amount === "" ? 0 : it.amount, dueDate: it.dueDate })),
     });
     if (!result.success) {
       const fe = zodFieldErrors(result.error);
@@ -158,6 +175,16 @@ export function NewContractFlow({ today }: { today: string }) {
   }, [v.startDate, v.endDate]);
 
   const showBalance = v.paymentStatus !== "paid_in_full";
+  const balanceTotal = v.instalments.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+
+  function updateInstalments(instalments: Values["instalments"]) {
+    setV((p) => ({ ...p, instalments }));
+    setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith("instalments"))));
+    setPreview(null);
+  }
+  function setInstalment(i: number, patch: Partial<Values["instalments"][number]>) {
+    updateInstalments(v.instalments.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  }
   const symbol = v.currency === "GBP" ? "£" : "$";
 
   return (
@@ -277,17 +304,42 @@ export function NewContractFlow({ today }: { today: string }) {
             </div>
 
             {showBalance && (
-              <div className="mt-5 grid gap-5 rounded-xl bg-paper p-4 sm:grid-cols-3">
-                <Field label="Outstanding balance" htmlFor="outstandingBalance" error={errors.outstandingBalance} hint="Optional">
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">{symbol}</span>
-                    <input id="outstandingBalance" inputMode="decimal" className="field-input pl-8 tabular-nums" value={v.outstandingBalance} onChange={(e) => set("outstandingBalance", e.target.value.replace(/[^\d.]/g, ""))} aria-invalid={!!errors.outstandingBalance} placeholder="0.00" />
-                  </div>
-                </Field>
-                <Field label="Balance due date" htmlFor="balanceDueDate" error={errors.balanceDueDate} hint="Optional">
-                  <input id="balanceDueDate" type="date" className="field-input" min={v.startDate} value={v.balanceDueDate} onChange={(e) => set("balanceDueDate", e.target.value)} aria-invalid={!!errors.balanceDueDate} />
-                </Field>
-                <Field label="Payment schedule" htmlFor="paymentSchedule" error={errors.paymentSchedule} hint="Optional — e.g. 3 monthly payments of £200 from 1 Dec">
+              <div className="mt-5 rounded-xl bg-paper p-4 sm:p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-[14px] font-medium">Balance still to pay</h3>
+                  <p className="text-[13.5px] text-muted tabular-nums">
+                    {balanceTotal > 0 ? `${new Intl.NumberFormat("en-GB", { style: "currency", currency: v.currency, minimumFractionDigits: Number.isInteger(balanceTotal) ? 0 : 2 }).format(balanceTotal)} in ${v.instalments.length} instalment${v.instalments.length === 1 ? "" : "s"}` : "Add the amount and due date of each payment"}
+                  </p>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {v.instalments.map((it, i) => (
+                    <div key={i} className="grid grid-cols-[auto_1fr_1fr_auto] items-start gap-2">
+                      <span className="pt-2.5 text-[13px] tabular-nums text-muted">{i + 1}.</span>
+                      <div>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">{symbol}</span>
+                          <input aria-label={`Instalment ${i + 1} amount`} inputMode="decimal" className="field-input pl-8 tabular-nums" value={it.amount} placeholder="0.00" aria-invalid={!!errors[`instalments.${i}.amount`]}
+                            onChange={(e) => setInstalment(i, { amount: e.target.value.replace(/[^\d.]/g, "") })} />
+                        </div>
+                        {errors[`instalments.${i}.amount`] && <p className="mt-1 text-[12.5px] text-red-800">{errors[`instalments.${i}.amount`]}</p>}
+                      </div>
+                      <div>
+                        <input aria-label={`Instalment ${i + 1} due date`} type="date" className="field-input" value={it.dueDate} aria-invalid={!!errors[`instalments.${i}.dueDate`]}
+                          onChange={(e) => setInstalment(i, { dueDate: e.target.value })} />
+                        {errors[`instalments.${i}.dueDate`] && <p className="mt-1 text-[12.5px] text-red-800">Choose a due date</p>}
+                      </div>
+                      <button type="button" aria-label={`Remove instalment ${i + 1}`} disabled={v.instalments.length === 1}
+                        onClick={() => updateInstalments(v.instalments.filter((_, j) => j !== i))}
+                        className="mt-1.5 rounded-lg px-2 py-1.5 text-muted hover:bg-ink/5 hover:text-ink disabled:invisible">✕</button>
+                    </div>
+                  ))}
+                </div>
+                {errors.instalments && <p className="mt-2 text-[13px] text-red-800" role="alert">{errors.instalments}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" disabled={v.instalments.length >= 24} onClick={() => updateInstalments([...v.instalments, { amount: v.instalments[v.instalments.length - 1]?.amount ?? "", dueDate: nextMonth(v.instalments[v.instalments.length - 1]?.dueDate) }])}
+                    className="rounded-lg border border-line-strong bg-white px-3 py-1.5 text-[13.5px] font-medium hover:border-ink/40">+ Add instalment</button>
+                </div>
+                <Field label="Payment schedule note" htmlFor="paymentSchedule" error={errors.paymentSchedule} hint="Optional. Leave blank to list the instalments above in the contract." className="mt-4">
                   <input id="paymentSchedule" className="field-input" value={v.paymentSchedule} onChange={(e) => set("paymentSchedule", e.target.value)} aria-invalid={!!errors.paymentSchedule} />
                 </Field>
               </div>
@@ -346,7 +398,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <p className="mt-3 text-[13px] text-muted">Reference {sent.reference}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <ButtonLink href={`/contracts/${sent.id}`} variant="secondary">View contract</ButtonLink>
-            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "" })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
+            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "", instalments: [] })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
           </div>
         </Card>
       )}

@@ -5,7 +5,15 @@ import { useState } from "react";
 import { Spinner, cx } from "@/components/ui";
 
 /** Records (or, for admins, undoes) collection of a contract's outstanding balance. */
-export function MarkCollectedButton({ id, amount, collected, canUndo, compact }: { id: string; amount: string; collected: boolean; canUndo: boolean; compact?: boolean }) {
+export function MarkCollectedButton({ id, instalmentId, amount, collected, canUndo, compact, label }: {
+  id: string;
+  instalmentId: string;
+  amount: string;
+  collected: boolean;
+  canUndo: boolean;
+  compact?: boolean;
+  label?: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +25,7 @@ export function MarkCollectedButton({ id, amount, collected, canUndo, compact }:
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/contracts/${id}/payment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ collected: !collected }) });
+      const res = await fetch(`/api/contracts/${id}/payment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instalmentId, collected: !collected }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
       router.refresh();
@@ -41,7 +49,7 @@ export function MarkCollectedButton({ id, amount, collected, canUndo, compact }:
         )}
       >
         {busy && <Spinner className="size-3.5" />}
-        {collected ? "Undo" : "Mark collected"}
+        {collected ? "Undo" : (label ?? "Mark collected")}
       </button>
       {error && <span className="max-w-[200px] text-right text-[12px] text-red-800">{error}</span>}
     </span>

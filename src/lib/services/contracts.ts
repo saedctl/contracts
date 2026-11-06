@@ -136,6 +136,9 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     balanceDueDate: input.paymentStatus !== "paid_in_full" && input.balanceDueDate ? input.balanceDueDate : null,
     balanceCollectedAt: null,
     balanceCollectedBy: null,
+    instalments: input.paymentStatus === "paid_in_full"
+      ? []
+      : input.instalments.map((it) => ({ id: randomToken(6), amount: it.amount, dueDate: it.dueDate, collectedAt: null, collectedBy: null })),
     templateVersionId: template.id,
     fieldValues,
     documentPath: null,
@@ -252,18 +255,38 @@ export async function deleteDraft(user: StaffUser, contract: Contract, meta: Req
   await store.deleteDraft(contract.id);
 }
 
-/** Records (or undoes) collection of a signed contract's outstanding balance. */
-export async function setBalanceCollected(user: StaffUser, contract: Contract, collected: boolean, meta: RequestMeta): Promise<Contract> {
+/**
+ * Records (or undoes) collection of one instalment of a signed contract's balance.
+ * Only the collected fields change; amounts and due dates are contract terms.
+ * `instalmentId` is "balance" for contracts created before instalments existed.
+ */
+export async function setInstalmentCollected(user: StaffUser, contract: Contract, instalmentId: string, collected: boolean, meta: RequestMeta): Promise<Contract> {
   if (!canAccess(user, contract)) throw new UserFacingError("Contract not found.");
   if (contract.status !== "signed") throw new UserFacingError("Payments are tracked once the contract is signed.");
-  if (!(contract.outstandingBalance > 0)) throw new UserFacingError("This contract has no outstanding balance.");
   if (!collected && user.role !== "admin") throw new UserFacingError("Only administrators can undo a recorded payment.");
-  const updated = await (await getStore()).updateContract(contract.id, {
-    balanceCollectedAt: collected ? new Date().toISOString() : null,
-    balanceCollectedBy: collected ? user.id : null,
-  });
+  const store = await getStore();
+  const now = new Date().toISOString();
+  let amount: number;
+  let dueDate: string | null;
+  let updated: Contract;
+  if (instalmentId === "balance" && !contract.instalments.length) {
+    if (!(contract.outstandingBalance > 0)) throw new UserFacingError("This contract has no outstanding balance.");
+    amount = contract.outstandingBalance;
+    dueDate = contract.balanceDueDate;
+    updated = await store.updateContract(contract.id, { balanceCollectedAt: collected ? now : null, balanceCollectedBy: collected ? user.id : null });
+  } else {
+    const item = contract.instalments.find((it) => it.id === instalmentId);
+    if (!item) throw new UserFacingError("Instalment not found.");
+    if (!!item.collectedAt === collected) return contract; // already in the requested state
+    amount = item.amount;
+    dueDate = item.dueDate;
+    const instalments = contract.instalments.map((it) =>
+      it.id === instalmentId ? { ...it, collectedAt: collected ? now : null, collectedBy: collected ? user.id : null } : it,
+    );
+    updated = await store.updateContract(contract.id, { instalments });
+  }
   await audit(contract.id, { type: "staff", user }, collected ? "payment.balance_collected" : "payment.balance_uncollected", {
-    amount: contract.outstandingBalance, currency: contract.currency, dueDate: contract.balanceDueDate,
+    instalmentId, amount, currency: contract.currency, dueDate,
   }, meta);
   return updated;
 }

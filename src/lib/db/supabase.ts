@@ -31,6 +31,7 @@ function mapContract(row: Row): Contract {
   c.balanceDueDate = c.balanceDueDate ?? null;
   c.balanceCollectedAt = c.balanceCollectedAt ?? null;
   c.balanceCollectedBy = c.balanceCollectedBy ?? null;
+  c.instalments = Array.isArray(c.instalments) ? c.instalments : [];
   c.templateVersion = template?.version;
   return c;
 }
@@ -40,7 +41,7 @@ const CONTRACT_SELECT = "*, creator:profiles!contracts_created_by_fkey(full_name
 function check<T>(res: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (res.error) {
     if (res.error.message.includes("immutable")) throw new ImmutableContractError();
-    if (/balance_(due_date|collected)|admin_delete_contract/.test(res.error.message)) {
+    if (/balance_(due_date|collected)|instalments|admin_delete_contract/.test(res.error.message)) {
       throw new Error("Database update needed: run supabase/migrations/0003_payments.sql in the Supabase SQL Editor.");
     }
     throw new Error(`Database error: ${res.error.message}`);
@@ -131,6 +132,7 @@ export class SupabaseStore implements Store {
     void _n; void _v;
     // Leave unset payment columns out so contracts can still be created before migration 0003.
     for (const k of ["balanceDueDate", "balanceCollectedAt", "balanceCollectedBy"] as const) if (rest[k] == null) delete rest[k];
+    if (Array.isArray(rest.instalments) && rest.instalments.length === 0) delete (rest as Partial<typeof rest>).instalments;
     return mapContract(check(await this.db.from("contracts").insert(snakeRow(rest as Row)).select(CONTRACT_SELECT).single()));
   }
   async getContract(id: string) {
