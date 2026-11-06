@@ -7,7 +7,7 @@ import { generatePassword, validateNewPassword } from "@/lib/auth/password";
 import { getStore } from "@/lib/db";
 import { requestMeta } from "@/lib/request";
 import { audit } from "@/lib/services/audit";
-import { UserFacingError } from "@/lib/services/contracts";
+import { UserFacingError } from "@/lib/errors";
 import { activateTemplateVersion, createTemplateVersion, tierLabel } from "@/lib/services/templates";
 import { STAFF_ROLES } from "@/lib/types";
 
