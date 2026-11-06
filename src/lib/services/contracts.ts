@@ -132,7 +132,10 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     currency: input.currency,
     paymentStatus: input.paymentStatus,
     paymentSchedule: input.paymentSchedule || null,
-    outstandingBalance: input.outstandingBalance ?? 0,
+    outstandingBalance: input.paymentStatus === "paid_in_full" ? 0 : (input.outstandingBalance ?? 0),
+    balanceDueDate: input.paymentStatus !== "paid_in_full" && input.balanceDueDate ? input.balanceDueDate : null,
+    balanceCollectedAt: null,
+    balanceCollectedBy: null,
     templateVersionId: template.id,
     fieldValues,
     documentPath: null,
@@ -247,6 +250,42 @@ export async function deleteDraft(user: StaffUser, contract: Contract, meta: Req
   await audit(contract.id, { type: "staff", user }, "contract.draft_deleted", { reference: contract.reference }, meta);
   if (contract.documentPath) await store.deleteFile(contract.documentPath);
   await store.deleteDraft(contract.id);
+}
+
+/** Records (or undoes) collection of a signed contract's outstanding balance. */
+export async function setBalanceCollected(user: StaffUser, contract: Contract, collected: boolean, meta: RequestMeta): Promise<Contract> {
+  if (!canAccess(user, contract)) throw new UserFacingError("Contract not found.");
+  if (contract.status !== "signed") throw new UserFacingError("Payments are tracked once the contract is signed.");
+  if (!(contract.outstandingBalance > 0)) throw new UserFacingError("This contract has no outstanding balance.");
+  if (!collected && user.role !== "admin") throw new UserFacingError("Only administrators can undo a recorded payment.");
+  const updated = await (await getStore()).updateContract(contract.id, {
+    balanceCollectedAt: collected ? new Date().toISOString() : null,
+    balanceCollectedBy: collected ? user.id : null,
+  });
+  await audit(contract.id, { type: "staff", user }, collected ? "payment.balance_collected" : "payment.balance_uncollected", {
+    amount: contract.outstandingBalance, currency: contract.currency, dueDate: contract.balanceDueDate,
+  }, meta);
+  return updated;
+}
+
+/**
+ * Permanently deletes a contract of any status (administrators only). Stored documents are
+ * removed, any open e-signature request is cancelled, and the deletion is kept in the audit log.
+ */
+export async function adminDeleteContract(admin: StaffUser, contract: Contract, confirmReference: string, meta: RequestMeta) {
+  if (admin.role !== "admin") throw new UserFacingError("Only administrators can delete contracts.");
+  if (confirmReference.trim().toUpperCase() !== contract.reference.toUpperCase()) {
+    throw new UserFacingError(`Type the reference ${contract.reference} to confirm.`);
+  }
+  const store = await getStore();
+  if (contract.esignProvider === "dropbox_sign" && contract.providerRequestId && ["sent", "viewed"].includes(contract.status)) {
+    await ds.cancelSignatureRequest(contract.providerRequestId).catch((e) => console.warn("cancel on delete failed", e));
+  }
+  await audit(contract.id, { type: "staff", user: admin }, "contract.deleted", {
+    reference: contract.reference, status: contract.status, signedAt: contract.signedAt, documentSha256: contract.documentSha256, signedDocumentSha256: contract.signedDocumentSha256,
+  }, meta);
+  for (const p of [contract.documentPath, contract.signedDocumentPath]) if (p) await store.deleteFile(p);
+  await store.adminDeleteContract(contract.id);
 }
 
 // ---------------------------------------------------------------------------------------------

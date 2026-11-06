@@ -11,6 +11,10 @@ import { formatDateTime, formatLongDate, formatMoney } from "@/lib/utils";
 import { Alert, ButtonLink, Card, StatusBadge } from "@/components/ui";
 import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 import { ContractActions } from "@/components/contracts/ContractActions";
+import { AdminDeleteContract } from "@/components/contracts/AdminDeleteContract";
+import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
+import { PAYMENT_STATE_LABELS, paymentRow } from "@/lib/payments";
+import { todayISO } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Contract" };
 
@@ -90,6 +94,31 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             </dl>
           </Card>
 
+          {c.status === "signed" && !c.anonymisedAt && (() => {
+            const r = paymentRow(c, todayISO());
+            return (
+              <Card className="p-5 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h2 className="font-serif text-lg font-semibold">Payment</h2>
+                  <span className={r.state === "overdue" ? "text-[13px] font-semibold text-red-800" : "text-[13px] font-medium text-muted"}>
+                    {r.state === "overdue" ? `Overdue by ${r.daysOverdue} day${r.daysOverdue === 1 ? "" : "s"}` : PAYMENT_STATE_LABELS[r.state]}
+                  </span>
+                </div>
+                <dl className="mt-4 grid gap-x-6 gap-y-4 text-[14px] sm:grid-cols-2">
+                  <Item label="Collected at signing" value={`${formatMoney(r.collectedAtSigning, c.currency)} on ${formatLongDate(r.collectedOn)}`} />
+                  {r.balance > 0 && <Item label="Balance" value={`${formatMoney(r.balance, c.currency)}${r.dueDate ? ` due ${formatLongDate(r.dueDate)}` : " (no due date)"}`} />}
+                  {r.balanceCollectedOn && <Item label="Balance collected" value={formatLongDate(r.balanceCollectedOn)} />}
+                  <Item label="Total collected" value={formatMoney(r.totalCollected, c.currency)} />
+                </dl>
+                {r.balance > 0 && (
+                  <div className="mt-4">
+                    <MarkCollectedButton id={c.id} amount={formatMoney(r.balance, c.currency)} collected={r.state === "collected"} canUndo={user.role === "admin"} />
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           {(c.status === "signed" || c.consentAt) && (
             <Card className="p-5 sm:p-6">
               <h2 className="font-serif text-lg font-semibold">Signing evidence</h2>
@@ -155,6 +184,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
               {emails.length === 0 && <li className="text-muted">No emails yet.</li>}
             </ul>
           </Card>
+          {user.role === "admin" && <AdminDeleteContract id={c.id} reference={c.reference} status={c.status} />}
         </div>
       </div>
     </div>

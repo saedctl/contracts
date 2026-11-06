@@ -121,6 +121,13 @@ Every save creates a new, immutable version. A contract records the version it w
 - **Templates per tier:** the Template page has **All tiers / Premium / VIP** tabs. A contract uses its tier's own active template if there is one, otherwise the All tiers template. Each tab has its own version history.
 - **Payment placeholders:** `{{total_fee}}` (paid + outstanding), `{{balance_due_date}}`, and `{{payment_summary}}`. The last is a full sentence that adapts to "paid in full" or "balance due by …".
 
+### 8. Payments and admin deletion
+
+- **Database setup:** run [`supabase/migrations/0003_payments.sql`](supabase/migrations/0003_payments.sql) in the Supabase SQL Editor (safe to re-run).
+- **Payments page:** lists signed contracts with cash collected (amount and date) and cash to be collected (amount and due date) against each member. The dashboard shows the same totals: collected, to be collected, and overdue. Totals are kept separate per currency.
+- **Mark collected:** records that a balance has arrived. Sales reps can mark their own contracts. Only administrators can undo it. Both actions are audit-logged.
+- **Delete contract (administrators only):** on a contract's page, under *Delete contract*. You confirm by typing the contract reference. It cancels any open Dropbox Sign request, removes the PDFs, and records the deletion (reference, status and document hashes) in the audit log.
+
 ## How signing works
 
 ```

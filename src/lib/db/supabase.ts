@@ -28,6 +28,9 @@ function mapContract(row: Row): Contract {
   c.amountPaid = Number(c.amountPaid);
   c.outstandingBalance = Number(c.outstandingBalance);
   c.createdByName = creator?.full_name;
+  c.balanceDueDate = c.balanceDueDate ?? null;
+  c.balanceCollectedAt = c.balanceCollectedAt ?? null;
+  c.balanceCollectedBy = c.balanceCollectedBy ?? null;
   c.templateVersion = template?.version;
   return c;
 }
@@ -37,6 +40,9 @@ const CONTRACT_SELECT = "*, creator:profiles!contracts_created_by_fkey(full_name
 function check<T>(res: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (res.error) {
     if (res.error.message.includes("immutable")) throw new ImmutableContractError();
+    if (/balance_(due_date|collected)|admin_delete_contract/.test(res.error.message)) {
+      throw new Error("Database update needed: run supabase/migrations/0003_payments.sql in the Supabase SQL Editor.");
+    }
     throw new Error(`Database error: ${res.error.message}`);
   }
   return res.data as T;
@@ -123,6 +129,8 @@ export class SupabaseStore implements Store {
   async insertContract(data: Omit<Contract, "id" | "createdAt" | "updatedAt">) {
     const { createdByName: _n, templateVersion: _v, ...rest } = data;
     void _n; void _v;
+    // Leave unset payment columns out so contracts can still be created before migration 0003.
+    for (const k of ["balanceDueDate", "balanceCollectedAt", "balanceCollectedBy"] as const) if (rest[k] == null) delete rest[k];
     return mapContract(check(await this.db.from("contracts").insert(snakeRow(rest as Row)).select(CONTRACT_SELECT).single()));
   }
   async getContract(id: string) {
@@ -144,6 +152,9 @@ export class SupabaseStore implements Store {
   }
   async deleteDraft(id: string) {
     check(await this.db.from("contracts").delete().eq("id", id).eq("status", "draft"));
+  }
+  async adminDeleteContract(id: string) {
+    check(await this.db.rpc("admin_delete_contract", { p_id: id }));
   }
   async anonymiseContract(id: string) {
     check(await this.db.rpc("anonymise_contract", { p_id: id }));

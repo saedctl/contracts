@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 // visitors from staff pages to the login screen. Authorisation itself is enforced on the
 // server in every page, route handler and server action — this is only a convenience layer.
 
-const STAFF_PREFIXES = ["/dashboard", "/contracts", "/admin", "/account"];
+const STAFF_PREFIXES = ["/dashboard", "/contracts", "/payments", "/admin", "/account"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

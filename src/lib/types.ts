@@ -67,6 +67,11 @@ export interface Contract {
   paymentStatus: PaymentStatus;
   paymentSchedule: string | null;
   outstandingBalance: number;
+  /** YYYY-MM-DD the outstanding balance is due, if any. */
+  balanceDueDate: string | null;
+  /** When staff recorded the outstanding balance as collected. */
+  balanceCollectedAt: string | null;
+  balanceCollectedBy: string | null;
   templateVersionId: string;
   templateVersion?: number;
   fieldValues: FieldValues;

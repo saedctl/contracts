@@ -35,6 +35,8 @@ export interface Store {
   listContracts(filter: ContractFilter): Promise<Contract[]>;
   updateContract(id: string, patch: ContractPatch): Promise<Contract>;
   deleteDraft(id: string): Promise<void>;
+  /** Deletes a contract of any status. Callers must have checked the user is an administrator. */
+  adminDeleteContract(id: string): Promise<void>;
   /** Irreversibly removes personal data from a contract past its retention period. */
   anonymiseContract(id: string): Promise<void>;
 
@@ -70,4 +72,7 @@ export const POST_SIGNATURE_MUTABLE: (keyof ContractPatch)[] = [
   "signedDocumentSha256",
   "providerData",
   "updatedAt",
+  // Payment bookkeeping, not contract terms.
+  "balanceCollectedAt",
+  "balanceCollectedBy",
 ];

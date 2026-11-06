@@ -6,6 +6,9 @@ import { productionBlockers } from "@/lib/config";
 import { findUnfilled } from "@/lib/template";
 import { pickTemplate, tierLabel } from "@/lib/services/templates";
 import { MEMBERSHIP_TIERS } from "@/lib/types";
+import { paymentRow, paymentTotals } from "@/lib/payments";
+import { todayISO } from "@/lib/utils";
+import { PaymentSummary } from "@/components/payments/PaymentSummary";
 import { getStore } from "@/lib/db";
 import { CONTRACT_STATUSES, type ContractStatus } from "@/lib/types";
 import { formatMoney, formatDateTime } from "@/lib/utils";
@@ -48,6 +51,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {sp.error === "forbidden" && <Alert tone="error">That page is only available to administrators.</Alert>}
+      {sp.deleted && <Alert tone="success">Contract {sp.deleted.slice(0, 40)} was deleted. The deletion is recorded in the audit log.</Alert>}
       {blockers.length > 0 && (
         <Alert tone="warning">
           <strong>Setup incomplete — contracts can&apos;t be sent yet.</strong>
@@ -68,6 +72,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </>
         );
       })()}
+
+      {!q && !status && (
+        <PaymentSummary
+          totals={paymentTotals(all.filter((c) => c.status === "signed" && !c.anonymisedAt).map((c) => paymentRow(c, todayISO())), todayISO())}
+          link
+        />
+      )}
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:p-5">
