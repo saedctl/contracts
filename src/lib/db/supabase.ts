@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../config";
 import type { AuditEvent, Contract, EmailLogEntry, StaffRole, StaffUser, TemplateVersion } from "../types";
 import { ImmutableContractError, type ContractFilter, type ContractPatch, type Store } from "./types";
+import { UserFacingError } from "../errors";
 
 const BUCKET = "contracts";
 
@@ -38,11 +39,25 @@ function mapContract(row: Row): Contract {
 
 const CONTRACT_SELECT = "*, creator:profiles!contracts_created_by_fkey(full_name), template:template_versions(version)";
 
+/**
+ * When the app is deployed ahead of the database, name the migration that fixes it instead of
+ * failing with a generic error. Shown to staff (the message contains no data).
+ */
+function migrationHint(message: string): string | null {
+  if (/balance_(due_date|collected)|instalments|admin_delete_contract/.test(message)) return "0003_payments.sql";
+  if (/create_template_version|activate_template_version|app_settings|p_tier|column .*tier|tier.* does not exist/.test(message)) return "0002_settings.sql";
+  return null;
+}
+
 function check<T>(res: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (res.error) {
     if (res.error.message.includes("immutable")) throw new ImmutableContractError();
-    if (/balance_(due_date|collected)|instalments|admin_delete_contract/.test(res.error.message)) {
-      throw new Error("Database update needed: run supabase/migrations/0003_payments.sql in the Supabase SQL Editor.");
+    const migration = migrationHint(res.error.message);
+    if (migration) {
+      console.error(`Database is missing migration ${migration}: ${res.error.message}`);
+      throw new UserFacingError(
+        `The database needs an update before this works. In Supabase, open SQL Editor, paste in supabase/migrations/${migration} from the repository and click Run, then try again.`,
+      );
     }
     throw new Error(`Database error: ${res.error.message}`);
   }
@@ -200,9 +215,7 @@ export class SupabaseStore implements Store {
   async setSetting(key: string, value: unknown) {
     const res = await this.db.from("app_settings").upsert({ key, value, updated_at: new Date().toISOString() });
     if (res.error) {
-      throw new Error(res.error.message.includes("app_settings")
-        ? "Run supabase/migrations/0002_settings.sql in the Supabase SQL Editor first."
-        : `Database error: ${res.error.message}`);
+      check(res);
     }
   }
   async claimWebhookEvent(key: string, provider: string, eventType: string, payload: unknown) {

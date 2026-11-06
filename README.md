@@ -108,6 +108,10 @@ Every save creates a new, immutable version. A contract records the version it w
 
 **Formatting:** `# Heading`, `## Sub-heading`, `**bold**`, `*italic*`, `- bullet`, `---` divider, and a blank line between paragraphs. A signature page (member name, email, signature and date fields, document reference and template version) is added automatically. It contains no contractual wording.
 
+### Updating the database after an upgrade
+
+When a new version of the app needs database changes, open the Supabase **SQL Editor**, paste in [`supabase/apply-updates.sql`](supabase/apply-updates.sql) and click **Run**. It contains every migration after `0001_init.sql`, and it's safe to run more than once. If you skip it, the app tells you which migration is missing instead of failing silently.
+
 ### 7. Company signature and document layout
 
 - **Database setup:** run [`supabase/migrations/0002_settings.sql`](supabase/migrations/0002_settings.sql) in the Supabase SQL Editor. It enables app settings and per-tier templates, and is safe to run again.
