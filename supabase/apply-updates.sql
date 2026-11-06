@@ -1,4 +1,4 @@
--- The Engineers Club — database updates 0002 + 0003 in one file.
+-- The Engineers Club — database updates 0002, 0003 and 0004 in one file.
 -- Paste into the Supabase SQL Editor and click Run. Safe to run more than once.
 -- (0001_init.sql must already have been run.) Generated from supabase/migrations/.
 
@@ -133,3 +133,7 @@ begin
   perform set_config('app.retention_erasure', 'off', true);
 end $$;
 revoke all on function public.admin_delete_contract(uuid) from public, anon, authenticated;
+
+-- Lifetime memberships have no end date. Run in the Supabase SQL Editor after 0003.
+-- Safe to run more than once.
+alter table public.contracts alter column end_date drop not null;

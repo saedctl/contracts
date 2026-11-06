@@ -110,7 +110,7 @@ Every save creates a new, immutable version. A contract records the version it w
 
 ### Updating the database after an upgrade
 
-When a new version of the app needs database changes, open the Supabase **SQL Editor**, paste in [`supabase/apply-updates.sql`](supabase/apply-updates.sql) and click **Run**. It contains every migration after `0001_init.sql`, and it's safe to run more than once. If you skip it, the app tells you which migration is missing instead of failing silently.
+When a new version of the app needs database changes, open the Supabase **SQL Editor**, paste in [`supabase/apply-updates.sql`](supabase/apply-updates.sql) and click **Run**. It contains every migration after `0001_init.sql` (currently 0002–0004), and it's safe to run more than once. If you skip it, the app tells you which migration is missing instead of failing silently.
 
 ### 7. Company signature and document layout
 

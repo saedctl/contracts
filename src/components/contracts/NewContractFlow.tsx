@@ -54,7 +54,8 @@ export function NewContractFlow({ today }: { today: string }) {
       const next = { ...prev, [key]: value };
       // Auto-calculate the end date from start + duration. Editing the end date by hand
       // switches the duration to "Custom" so the contract always describes the real term.
-      if ((key === "duration" || key === "startDate") && next.duration && next.duration !== "custom" && next.startDate) {
+      if (key === "duration" && value === "lifetime") next.endDate = "";
+      if ((key === "duration" || key === "startDate") && next.duration && next.duration !== "custom" && next.duration !== "lifetime" && next.startDate) {
         next.endDate = calculateEndDate(next.startDate, Number(next.duration));
       }
       if (key === "endDate" && prev.duration !== "custom" && value !== calculateEndDate(prev.startDate, Number(prev.duration))) {
@@ -273,9 +274,15 @@ export function NewContractFlow({ today }: { today: string }) {
               <Field label="Start date" htmlFor="startDate" required error={errors.startDate}>
                 <input id="startDate" type="date" className="field-input" value={v.startDate} onChange={(e) => set("startDate", e.target.value)} aria-invalid={!!errors.startDate} />
               </Field>
-              <Field label="End date" htmlFor="endDate" required error={errors.endDate} hint={termHint ? `${termHint}${v.duration !== "custom" ? " · auto-calculated" : ""}` : "Calculated from the duration"}>
-                <input id="endDate" type="date" className="field-input" min={v.startDate} value={v.endDate} onChange={(e) => set("endDate", e.target.value)} aria-invalid={!!errors.endDate} />
-              </Field>
+              {v.duration === "lifetime" ? (
+                <Field label="End date" htmlFor="endDate">
+                  <p id="endDate" className="flex min-h-[46px] items-center rounded-lg border border-dashed border-line-strong px-3.5 text-[14px] text-muted">No end date (lifetime)</p>
+                </Field>
+              ) : (
+                <Field label="End date" htmlFor="endDate" required error={errors.endDate} hint={termHint ? `${termHint}${v.duration !== "custom" ? " · auto-calculated" : ""}` : "Calculated from the duration"}>
+                  <input id="endDate" type="date" className="field-input" min={v.startDate} value={v.endDate} onChange={(e) => set("endDate", e.target.value)} aria-invalid={!!errors.endDate} />
+                </Field>
+              )}
             </div>
 
             <div className="mt-6 grid gap-5 sm:grid-cols-3">

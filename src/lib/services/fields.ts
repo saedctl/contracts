@@ -7,8 +7,10 @@ import type { ContractInput } from "../validation";
 
 /** Formats the approved placeholder values for a contract. Frozen onto the contract at generation. */
 export function buildFieldValues(input: ContractInput, reference: string, issuedOn = todayISO()): FieldValues {
-  const duration =
-    input.duration === "custom"
+  const lifetime = input.duration === "lifetime";
+  const duration = lifetime
+    ? "Lifetime"
+    : input.duration === "custom"
       ? describeTerm(input.startDate, input.endDate)
       : `${input.duration} month${input.duration === "1" ? "" : "s"}`;
   const outstanding = input.paymentStatus === "paid_in_full" ? 0 : (input.outstandingBalance ?? 0);
@@ -29,7 +31,7 @@ export function buildFieldValues(input: ContractInput, reference: string, issued
     customer_email: input.customerEmail,
     customer_phone: input.customerPhone,
     membership_start_date: formatLongDate(input.startDate),
-    membership_end_date: formatLongDate(input.endDate),
+    membership_end_date: lifetime ? "No end date (lifetime)" : formatLongDate(input.endDate),
     membership_duration: duration,
     membership_tier: MEMBERSHIP_TIER_LABELS[input.membershipTier],
     amount_paid: formatMoney(input.amountPaid, input.currency),
