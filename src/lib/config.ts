@@ -18,6 +18,11 @@ function appUrl(): string {
   return "http://localhost:3000";
 }
 
+/** "false", "False", " false ", '"false"', "0", "no", "off" all count as false. */
+function isFalse(value: string | undefined): boolean {
+  return ["false", "0", "no", "off"].includes((value ?? "").trim().replace(/^["']|["']$/g, "").trim().toLowerCase());
+}
+
 const supabase =
   env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.SUPABASE_SERVICE_ROLE_KEY
     ? { url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY, serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY }
@@ -29,7 +34,7 @@ const dropboxSign =
         apiKey: env.DROPBOX_SIGN_API_KEY,
         clientId: env.DROPBOX_SIGN_CLIENT_ID,
         // Test mode is free and produces non-binding documents. Must be explicitly disabled for live use.
-        testMode: env.DROPBOX_SIGN_TEST_MODE !== "false",
+        testMode: !isFalse(env.DROPBOX_SIGN_TEST_MODE),
       }
     : null;
 
