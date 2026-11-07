@@ -1,5 +1,5 @@
 // Netlify scheduled function: the Netlify equivalent of the Vercel Cron entry in vercel.json.
-// Once a day it calls /api/cron/maintenance, which expires stale signing links, reconciles
+// Every hour it calls /api/cron/maintenance, which expires stale signing links, reconciles
 // with Dropbox Sign in case a webhook was missed, and applies the data-retention policy.
 
 export default async function maintenance() {
@@ -15,4 +15,6 @@ export default async function maintenance() {
   return new Response(body, { status: res.status });
 }
 
-export const config = { schedule: "17 3 * * *" };
+// Hourly: reconciles signatures with Dropbox Sign in case a webhook was missed (cheap when
+// nothing is pending); also runs link expiry and retention.
+export const config = { schedule: "17 * * * *" };

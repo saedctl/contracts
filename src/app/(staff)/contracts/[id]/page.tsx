@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth/session";
 import { getStore } from "@/lib/db";
-import { getContractForStaff } from "@/lib/services/contracts";
+import { autoSyncIfAwaiting, getContractForStaff } from "@/lib/services/contracts";
 import { EVENT_LABELS } from "@/lib/services/audit";
 import { contractDoc } from "@/lib/services/document";
 import { PAYMENT_STATUS_LABELS } from "@/lib/types";
@@ -22,8 +22,10 @@ type Signer = { name?: string; email?: string; signedAt?: string | null; signatu
 
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
-  const c = await getContractForStaff(user, (await params).id);
-  if (!c) notFound();
+  const found = await getContractForStaff(user, (await params).id);
+  if (!found) notFound();
+  // If Dropbox Sign's webhook was missed, opening the contract picks up the latest status.
+  const c = await autoSyncIfAwaiting(found);
   const store = await getStore();
   const [events, emails, doc] = await Promise.all([
     store.listAuditEvents({ contractId: c.id, limit: 100 }),

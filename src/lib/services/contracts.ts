@@ -569,6 +569,26 @@ export async function syncFromProvider(contractId: string): Promise<Contract> {
   return (await store.getContract(c.id))!;
 }
 
+const lastAutoSync = new Map<string, number>();
+
+/**
+ * Safety net for missed webhooks: when staff open a contract that is waiting on Dropbox Sign,
+ * check its status with the provider (at most once a minute per contract). Never throws.
+ */
+export async function autoSyncIfAwaiting(c: Contract): Promise<Contract> {
+  const awaiting = ["sent", "viewed"].includes(c.status) || (c.status === "signed" && (!c.signedDocumentPath || !c.confirmationSentAt));
+  if (c.esignProvider !== "dropbox_sign" || !c.providerRequestId || !awaiting || !config.dropboxSign) return c;
+  const last = lastAutoSync.get(c.id) ?? 0;
+  if (Date.now() - last < 60_000) return c;
+  lastAutoSync.set(c.id, Date.now());
+  try {
+    return await syncFromProvider(c.id);
+  } catch (e) {
+    console.error("auto-sync failed", c.id, e);
+    return c;
+  }
+}
+
 async function sendConfirmations(contractId: string) {
   const store = await getStore();
   const c = await store.getContract(contractId);
