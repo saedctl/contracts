@@ -8,6 +8,8 @@ A small, purpose-built contract tool for **The Engineers Club** (operated by Har
 2. **Review contract**: the agreement is shown with every filled-in value highlighted. A PDF preview is available.
 3. **Send for signature**: one click. The customer gets a branded email with a secure link, reads the full agreement, gives consent and signs by drawing, typing or uploading a signature. Both sides receive the signed PDF, and the status changes to **Signed** once Dropbox Sign confirms completion.
 
+At any point, **Save as draft** keeps the contract without sending it. Drafts show on the dashboard; open one and click **Edit draft** to change it, or **Send for signature** when you're ready. Saving again updates the same draft, and the agreement is regenerated each time.
+
 ---
 
 ## Stack

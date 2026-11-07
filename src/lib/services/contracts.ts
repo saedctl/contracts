@@ -93,12 +93,12 @@ function esignProvider() {
   return config.dropboxSign ? ("dropbox_sign" as const) : ("demo" as const);
 }
 
-export async function createContract(user: StaffUser, input: ContractInput, meta: RequestMeta): Promise<Contract> {
-  const blockers = productionBlockers();
-  if (blockers.length) throw new UserFacingError(`Setup incomplete — ${blockers[0]}. See the setup guide in README.md.`);
-  const store = await getStore();
+/**
+ * Fills the template for `input` and renders the PDF. Shared by new contracts and edited drafts,
+ * so a draft is regenerated exactly as a new contract would be.
+ */
+async function generateDocument(input: ContractInput, reference: string) {
   const template = await requireTemplate(input.membershipTier);
-  const reference = await store.nextReference();
   const issuedAt = new Date();
   const fieldValues = await fieldsWithCompany(input, reference, issuedAt.toISOString().slice(0, 10));
   const provider = esignProvider();
@@ -112,16 +112,12 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     doc, reference, templateVersion: template.version, issuedAt, companySignatureImage: companyImage,
     textTags: provider === "dropbox_sign", demo: provider === "demo",
   });
-  const documentSha256 = sha256Hex(bytes);
 
   // Lifetime memberships never end, so their records are kept (no retention date).
   const retention = input.endDate ? new Date(input.endDate) : null;
   retention?.setUTCFullYear(retention.getUTCFullYear() + config.retentionYears);
 
-  const contract = await store.insertContract({
-    reference,
-    createdBy: user.id,
-    status: "draft",
+  const terms = {
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     customerPhone: input.customerPhone,
@@ -135,21 +131,42 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     paymentSchedule: input.paymentSchedule || null,
     outstandingBalance: input.paymentStatus === "paid_in_full" ? 0 : (input.outstandingBalance ?? 0),
     balanceDueDate: input.paymentStatus !== "paid_in_full" && input.balanceDueDate ? input.balanceDueDate : null,
-    balanceCollectedAt: null,
-    balanceCollectedBy: null,
     instalments: input.paymentStatus === "paid_in_full"
       ? []
       : input.instalments.map((it) => ({ id: randomToken(6), amount: it.amount, dueDate: it.dueDate, collectedAt: null, collectedBy: null })),
     templateVersionId: template.id,
     fieldValues,
+    documentSha256: sha256Hex(bytes),
+    esignProvider: provider,
+    providerData: provider === "demo" ? { layout } : null,
+    isDemo: provider === "demo",
+    retentionUntil: retention ? retention.toISOString().slice(0, 10) : null,
+  };
+  return { template, bytes, terms };
+}
+
+export async function createContract(user: StaffUser, input: ContractInput, meta: RequestMeta): Promise<Contract> {
+  const blockers = productionBlockers();
+  if (blockers.length) throw new UserFacingError(`Setup incomplete — ${blockers[0]}. See the setup guide in README.md.`);
+  const store = await getStore();
+  // Check the template before using up a reference number.
+  await requireTemplate(input.membershipTier);
+  const reference = await store.nextReference();
+  const { template, bytes, terms } = await generateDocument(input, reference);
+  const { documentSha256, esignProvider: provider } = terms;
+
+  const contract = await store.insertContract({
+    ...terms,
+    reference,
+    createdBy: user.id,
+    status: "draft",
+    balanceCollectedAt: null,
+    balanceCollectedBy: null,
     documentPath: null,
-    documentSha256,
     signedDocumentPath: null,
     signedDocumentSha256: null,
-    esignProvider: provider,
     providerRequestId: null,
     providerSignatureId: null,
-    providerData: provider === "demo" ? { layout } : null,
     linkNonce: randomToken(),
     linkExpiresAt: null,
     sentAt: null,
@@ -158,8 +175,6 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     signedAt: null,
     declinedAt: null,
     confirmationSentAt: null,
-    isDemo: provider === "demo",
-    retentionUntil: retention ? retention.toISOString().slice(0, 10) : null,
     anonymisedAt: null,
   });
 
@@ -170,6 +185,22 @@ export async function createContract(user: StaffUser, input: ContractInput, meta
     reference, templateVersion: template.version, templateSha256: template.bodySha256, documentSha256, provider,
   }, meta);
   return saved;
+}
+
+/** Replaces an unsent draft's details and regenerates its agreement. The reference is kept. */
+export async function updateDraft(user: StaffUser, contract: Contract, input: ContractInput, meta: RequestMeta): Promise<Contract> {
+  if (!canAccess(user, contract)) throw new UserFacingError("Contract not found.");
+  if (contract.status !== "draft" || contract.providerRequestId) throw new UserFacingError("Only drafts that haven't been sent can be edited.");
+  const store = await getStore();
+  const { template, bytes, terms } = await generateDocument(input, contract.reference);
+  const path = `${contract.id}/agreement-${terms.documentSha256.slice(0, 12)}.pdf`;
+  if (!(await store.getFile(path))) await store.putFile(path, bytes, "application/pdf");
+  const updated = await store.updateContract(contract.id, { ...terms, documentPath: path });
+  if (contract.documentPath && contract.documentPath !== path) await store.deleteFile(contract.documentPath);
+  await audit(contract.id, { type: "staff", user }, "contract.draft_updated", {
+    templateVersion: template.version, documentSha256: terms.documentSha256,
+  }, meta);
+  return updated;
 }
 
 // ---------------------------------------------------------------------------------------------
