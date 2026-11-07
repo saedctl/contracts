@@ -24,6 +24,8 @@ export const contractInputSchema = z
     /** Empty for a lifetime membership. */
     endDate: z.union([isoDate, z.literal("")]).optional().default(""),
     amountPaid: money("Amount paid"),
+    /** Date the amount paid was received; may be backdated. Empty means the contract date. */
+    amountPaidOn: z.union([isoDate, z.literal("")]).optional().default(""),
     currency: z.enum(CURRENCIES),
     paymentStatus: z.enum(PAYMENT_STATUSES, { message: "Choose a payment status" }),
     paymentSchedule: z.string().trim().max(1000, "Payment schedule is too long").optional().default(""),
@@ -37,6 +39,9 @@ export const contractInputSchema = z
       .default([]),
   })
   .superRefine((v, ctx) => {
+    if (v.amountPaidOn && v.amountPaidOn > new Date().toISOString().slice(0, 10)) {
+      ctx.addIssue({ code: "custom", path: ["amountPaidOn"], message: "The payment date can't be in the future" });
+    }
     if (v.duration !== "lifetime" && !v.endDate) {
       ctx.addIssue({ code: "custom", path: ["endDate"], message: "Enter a valid date" });
     }

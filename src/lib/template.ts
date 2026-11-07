@@ -21,6 +21,7 @@ export const PLACEHOLDERS = [
   { key: "membership_duration", label: "Membership duration", example: "12 months" },
   { key: "membership_tier", label: "Membership tier", example: "Premium" },
   { key: "amount_paid", label: "Amount paid", example: "£999.00" },
+  { key: "amount_paid_date", label: "Date the amount paid was received", example: "3 November 2026" },
   { key: "currency", label: "Currency code", example: "GBP" },
   { key: "payment_status", label: "Payment status", example: "Paid in Full" },
   { key: "outstanding_balance", label: "Outstanding balance", example: "£0.00" },

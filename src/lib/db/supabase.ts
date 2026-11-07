@@ -33,6 +33,7 @@ function mapContract(row: Row): Contract {
   c.balanceCollectedAt = c.balanceCollectedAt ?? null;
   c.balanceCollectedBy = c.balanceCollectedBy ?? null;
   c.instalments = Array.isArray(c.instalments) ? c.instalments : [];
+  c.amountPaidOn = c.fieldValues?._amount_paid_on ?? null;
   c.templateVersion = template?.version;
   return c;
 }

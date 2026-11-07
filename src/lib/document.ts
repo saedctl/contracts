@@ -54,7 +54,8 @@ export function detailRows(v: Record<string, string>): DetailRow[] {
       ? `From ${v.membership_start_date} (lifetime)`
       : `${v.membership_start_date} – ${v.membership_end_date} (${v.membership_duration})`,
   });
-  rows.push({ label: "Amount collected", value: v.contract_date ? `${v.amount_paid} on ${v.contract_date}` : v.amount_paid });
+  const paidOn = v.amount_paid_date || v.contract_date;
+  rows.push({ label: "Amount collected", value: paidOn ? `${v.amount_paid} on ${paidOn}` : v.amount_paid });
   rows.push({ label: "Payment status", value: v.payment_status });
   if (v.payment_status !== "Paid in Full") {
     const n = Number(v.instalment_count || 0);

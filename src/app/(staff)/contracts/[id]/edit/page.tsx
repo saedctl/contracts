@@ -25,6 +25,7 @@ function formValues(c: Contract): ContractFormState {
     startDate: c.startDate,
     endDate: c.endDate ?? "",
     amountPaid: String(c.amountPaid),
+    amountPaidOn: c.amountPaidOn ?? c.createdAt.slice(0, 10),
     currency: c.currency,
     paymentStatus: c.paymentStatus,
     paymentSchedule: c.paymentSchedule ?? "",

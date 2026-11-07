@@ -167,6 +167,7 @@ export class DemoStore implements Store {
       balanceCollectedAt: c.balanceCollectedAt ?? null,
       balanceCollectedBy: c.balanceCollectedBy ?? null,
       instalments: c.instalments ?? [],
+      amountPaidOn: c.fieldValues?._amount_paid_on ?? null,
       createdByName: d.staff.find((s) => s.id === c.createdBy)?.fullName,
       templateVersion: d.templates.find((t) => t.id === c.templateVersionId)?.version,
     };
