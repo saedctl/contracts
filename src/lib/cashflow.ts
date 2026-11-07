@@ -12,7 +12,7 @@ export interface CashEvent {
   amount: number;
   /** Collection date for collected money, due date for money still owed. YYYY-MM-DD */
   date: string;
-  /** "At signing", "Instalment 2 of 3" or "Balance". */
+  /** "Upfront payment", "Instalment 2 of 3" or "Balance". */
   label: string;
   state: "collected" | "due" | "overdue";
   /** Set for amounts still owed, so they can be marked collected. */
@@ -54,7 +54,7 @@ export function cashEvents(contracts: Contract[], today: string): CashEvent[] {
     if (c.status !== "signed" || c.anonymisedAt) continue;
     const base = { contractId: c.id, customerName: c.customerName, reference: c.reference, currency: c.currency };
     if (c.amountPaid > 0) {
-      events.push({ ...base, amount: c.amountPaid, date: c.createdAt.slice(0, 10), label: "At signing", state: "collected" });
+      events.push({ ...base, amount: c.amountPaid, date: c.amountPaidOn ?? c.createdAt.slice(0, 10), label: "Upfront payment", state: "collected" });
     }
     const plan = planOf(c, today);
     plan.forEach((it, i) => {

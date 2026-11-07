@@ -93,7 +93,7 @@ export function paymentRow(c: Contract, today: string): PaymentRow {
   return {
     contract: c,
     collectedAtSigning: c.amountPaid,
-    collectedOn: c.createdAt.slice(0, 10),
+    collectedOn: c.amountPaidOn ?? c.createdAt.slice(0, 10),
     plan,
     balance,
     outstanding,

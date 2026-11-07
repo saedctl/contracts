@@ -13,7 +13,7 @@ type Step = "details" | "review" | "sent";
 export type ContractFormState = {
   customerName: string; customerEmail: string; customerPhone: string;
   membershipTier: MembershipTier | ""; duration: string; startDate: string; endDate: string;
-  amountPaid: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
+  amountPaid: string; amountPaidOn: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
   paymentSchedule: string; outstandingBalance: string; balanceDueDate: string;
   instalments: { amount: string; dueDate: string }[];
 };
@@ -41,7 +41,7 @@ export function NewContractFlow({ today, draft }: { today: string; draft?: { id:
   const [v, setV] = useState<Values>(draft?.values ?? {
     customerName: "", customerEmail: "", customerPhone: "",
     membershipTier: "", duration: "", startDate: today, endDate: "",
-    amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "",
+    amountPaid: "", amountPaidOn: today, currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "",
     instalments: [],
   });
   // Once saved, the draft is updated in place rather than creating another contract.
@@ -327,7 +327,7 @@ export function NewContractFlow({ today, draft }: { today: string; draft?: { id:
               )}
             </div>
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-3">
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Amount paid" htmlFor="amountPaid" required error={errors.amountPaid} className="sm:col-span-2">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -342,6 +342,9 @@ export function NewContractFlow({ today, draft }: { today: string; draft?: { id:
                     ))}
                   </div>
                 </div>
+              </Field>
+              <Field label="Paid on" htmlFor="amountPaidOn" error={errors.amountPaidOn} hint="Change if paid earlier">
+                <input id="amountPaidOn" type="date" className="field-input" max={today} value={v.amountPaidOn} onChange={(e) => set("amountPaidOn", e.target.value)} aria-invalid={!!errors.amountPaidOn} />
               </Field>
               <Field label="Payment status" htmlFor="paymentStatus" required error={errors.paymentStatus}>
                 <select id="paymentStatus" className="field-input" value={v.paymentStatus} onChange={(e) => set("paymentStatus", e.target.value as Values["paymentStatus"])}>
@@ -456,7 +459,7 @@ export function NewContractFlow({ today, draft }: { today: string; draft?: { id:
           <p className="mt-3 text-[13px] text-muted">Reference {sent.reference}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <ButtonLink href={`/contracts/${sent.id}`} variant="secondary">View contract</ButtonLink>
-            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "", instalments: [] })); setSent(null); setPreview(null); setDraftRef(null); setSavedAt(null); window.history.replaceState(null, "", "/contracts/new"); setStep("details"); }}>+ Create another</Button>
+            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", amountPaidOn: today, paymentSchedule: "", outstandingBalance: "", balanceDueDate: "", instalments: [] })); setSent(null); setPreview(null); setDraftRef(null); setSavedAt(null); window.history.replaceState(null, "", "/contracts/new"); setStep("details"); }}>+ Create another</Button>
           </div>
         </Card>
       )}

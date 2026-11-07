@@ -73,6 +73,11 @@ export interface Contract {
   /** YYYY-MM-DD; null for a lifetime membership. */
   endDate: string | null;
   amountPaid: number;
+  /**
+   * YYYY-MM-DD the amount paid was received (may be before the contract date). Derived from
+   * fieldValues._amount_paid_on; null for older contracts (use the contract date).
+   */
+  amountPaidOn: string | null;
   currency: Currency;
   paymentStatus: PaymentStatus;
   paymentSchedule: string | null;
@@ -112,7 +117,7 @@ export interface Contract {
 
 export type NewContract = Omit<
   Contract,
-  "id" | "reference" | "createdAt" | "updatedAt" | "createdByName" | "templateVersion"
+  "id" | "reference" | "createdAt" | "updatedAt" | "createdByName" | "templateVersion" | "amountPaidOn"
 >;
 
 export type ActorType = "staff" | "customer" | "provider" | "system";

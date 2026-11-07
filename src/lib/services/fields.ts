@@ -14,7 +14,8 @@ export function buildFieldValues(input: ContractInput, reference: string, issued
       ? describeTerm(input.startDate, input.endDate)
       : `${input.duration} month${input.duration === "1" ? "" : "s"}`;
   const outstanding = input.paymentStatus === "paid_in_full" ? 0 : (input.outstandingBalance ?? 0);
-  const paidOn = formatLongDate(issuedOn);
+  // The payment may have been received before the contract was issued (backdated).
+  const paidOn = formatLongDate(input.amountPaidOn || issuedOn);
   const dueDate = outstanding > 0 && input.balanceDueDate ? formatLongDate(input.balanceDueDate) : "";
   const plan = outstanding > 0 ? input.instalments : [];
   const schedule = plan.length
@@ -45,6 +46,9 @@ export function buildFieldValues(input: ContractInput, reference: string, issued
     payment_summary: paymentSummary,
     contract_reference: reference,
     contract_date: formatLongDate(issuedOn),
+    amount_paid_date: paidOn,
+    // Machine-readable payment date (YYYY-MM-DD) for the Payments page and monthly cash.
+    _amount_paid_on: input.amountPaidOn || issuedOn,
     company_name: BRAND.legalName,
     company_number: BRAND.companyNumber,
     business_name: BRAND.name,

@@ -57,7 +57,7 @@ export async function seedDemo(store: DemoStore) {
   const start = todayISO();
   const make = (name: string, email: string, amount: number, months: 3 | 6 | 12): ContractInput => ({
     customerName: name, customerEmail: email, customerPhone: "+44 7700 900000", membershipTier: months === 12 ? "vip" : "premium", duration: String(months) as "3",
-    startDate: start, endDate: calculateEndDate(start, months), amountPaid: amount, currency: "GBP",
+    startDate: start, endDate: calculateEndDate(start, months), amountPaid: amount, amountPaidOn: "", currency: "GBP",
     paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0, balanceDueDate: "", instalments: [],
   });
 
@@ -80,7 +80,7 @@ export async function seedDemo(store: DemoStore) {
     const at = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString();
     const signPlan = async (name: string, email: string, paid: number, plan: [number, number][], collected: number, signedDaysAgo: number) => {
       const input: ContractInput = {
-        ...make(name, email, paid, 12), membershipTier: "premium", startDate: day(-signedDaysAgo), endDate: calculateEndDate(day(-signedDaysAgo), 12),
+        ...make(name, email, paid, 12), membershipTier: "premium", amountPaidOn: day(-signedDaysAgo), startDate: day(-signedDaysAgo), endDate: calculateEndDate(day(-signedDaysAgo), 12),
         paymentStatus: plan.length ? "payment_plan" : "paid_in_full", instalments: plan.map(([amount, offset]) => ({ amount, dueDate: day(offset) })),
         outstandingBalance: plan.reduce((a, [amt]) => a + amt, 0), balanceDueDate: plan.length ? day(plan[plan.length - 1][1]) : "",
       };
