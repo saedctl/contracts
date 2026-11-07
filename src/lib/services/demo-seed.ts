@@ -74,23 +74,34 @@ export async function seedDemo(store: DemoStore) {
 
     await createContract(sales, make("Michael Jones", "michael.jones@example.com", 299, 3), seedMeta);
 
-    // Signed members on payment plans, so the Payments page has something to show.
+    // Signed members over the last few months (dates backdated), so the Payments page and the
+    // monthly cash chart have realistic history and upcoming payments to show.
     const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
-    const signPlan = async (name: string, email: string, paid: number, plan: [number, number][], collectFirst: number) => {
+    const at = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString();
+    const signPlan = async (name: string, email: string, paid: number, plan: [number, number][], collected: number, signedDaysAgo: number) => {
       const input: ContractInput = {
-        ...make(name, email, paid, 12), membershipTier: "premium", startDate: day(-45), endDate: calculateEndDate(day(-45), 12),
-        paymentStatus: "payment_plan", instalments: plan.map(([amount, offset]) => ({ amount, dueDate: day(offset) })),
-        outstandingBalance: plan.reduce((a, [amt]) => a + amt, 0), balanceDueDate: day(plan[plan.length - 1][1]),
+        ...make(name, email, paid, 12), membershipTier: "premium", startDate: day(-signedDaysAgo), endDate: calculateEndDate(day(-signedDaysAgo), 12),
+        paymentStatus: plan.length ? "payment_plan" : "paid_in_full", instalments: plan.map(([amount, offset]) => ({ amount, dueDate: day(offset) })),
+        outstandingBalance: plan.reduce((a, [amt]) => a + amt, 0), balanceDueDate: plan.length ? day(plan[plan.length - 1][1]) : "",
       };
       const c = await createContract(sales, input, seedMeta);
       await startSigning(await sendContract(sales, c, seedMeta), seedMeta);
       await completeDemoSignature((await store.getContract(c.id))!, { kind: "type", typedName: name }, seedMeta);
       let signed = (await store.getContract(c.id)) as Contract;
-      for (const it of signed.instalments.slice(0, collectFirst)) signed = await setInstalmentCollected(sales as StaffUser, signed, it.id, true, seedMeta);
+      for (const it of signed.instalments.slice(0, collected)) signed = await setInstalmentCollected(sales as StaffUser, signed, it.id, true, seedMeta);
+      await store.demoBackdate(c.id, {
+        createdAt: at(-signedDaysAgo), sentAt: at(-signedDaysAgo), signedAt: at(-signedDaysAgo),
+        // Collected instalments are recorded as paid on their due date.
+        instalments: signed.instalments.map((it) => (it.collectedAt ? { ...it, collectedAt: `${it.dueDate}T10:00:00.000Z` } : it)),
+      });
     };
-    await signPlan("Abdulfattah Abdi", "abdulfattah@example.com", 1500, [[1300, 24]], 0);
-    await signPlan("Amira Hassan", "amira.hassan@example.com", 1000, [[600, -30], [600, -6], [600, 24]], 1);
-    await signPlan("Daniel Okafor", "daniel.okafor@example.com", 800, [[1000, -14], [1000, 16]], 2);
+    await signPlan("Lina Haddad", "lina.haddad@example.com", 2800, [], 0, 150);
+    await signPlan("Daniel Okafor", "daniel.okafor@example.com", 800, [[1000, -90], [1000, -60]], 2, 120);
+    await signPlan("Amira Hassan", "amira.hassan@example.com", 1000, [[600, -60], [600, -6], [600, 24]], 1, 95);
+    await signPlan("Abdulfattah Abdi", "abdulfattah@example.com", 1500, [[1300, 24]], 0, 70);
+    await signPlan("Omar Siddiqui", "omar.siddiqui@example.com", 500, [[500, -2], [500, 28], [500, 58]], 1, 35);
+    await signPlan("Priya Patel", "priya.patel@example.com", 2800, [], 0, 10);
+    await signPlan("Tom Reed", "tom.reed@example.com", 1000, [[900, 32], [900, 62]], 0, 3);
   } catch (e) {
     console.error("Demo seed: could not create example contracts", e);
   }
