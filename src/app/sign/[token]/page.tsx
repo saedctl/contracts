@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
-import { resolveSigningToken, CONSENT_STATEMENT } from "@/lib/services/contracts";
+import { resolveSigningToken, CONSENT_STATEMENT, isHostedSigning } from "@/lib/services/contracts";
 import { contractDoc } from "@/lib/services/document";
 import type { Contract } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 import { SigningPanel } from "@/components/sign/SigningPanel";
+import { HostedSigningPanel } from "@/components/sign/HostedSigningPanel";
 import { AutoRefresh } from "@/components/sign/AutoRefresh";
 import { PrintButton } from "@/components/sign/PrintButton";
 
@@ -110,7 +111,9 @@ async function Agreement({ token, contract: c, state }: { token: string; contrac
         )}
         {state === "ready" && (
           <Banner icon="pen" title={`Hi ${firstName}, please review and sign your agreement`}>
-            Read the agreement below. When you&apos;re ready, confirm and sign at the bottom of the page — it takes less than a minute.
+            {isHostedSigning(c)
+              ? <>Read the agreement below, then sign it using the link in the email from <strong className="text-ink">Dropbox Sign</strong>, our secure e-signature provider.</>
+              : <>Read the agreement below. When you&apos;re ready, confirm and sign at the bottom of the page — it takes less than a minute.</>}
             {c.isDemo && <span className="mt-1 block font-semibold text-red-800">Demo mode: this is a test agreement. Signing here is simulated and not legally binding.</span>}
           </Banner>
         )}
@@ -122,7 +125,9 @@ async function Agreement({ token, contract: c, state }: { token: string; contrac
 
       {state === "ready" && (
         <div className="no-print mx-auto mt-6 max-w-[880px]">
-          <SigningPanel token={token} consentStatement={CONSENT_STATEMENT} customerName={c.customerName} mode={c.esignProvider} />
+          {isHostedSigning(c)
+            ? <HostedSigningPanel token={token} email={c.customerEmail} />
+            : <SigningPanel token={token} consentStatement={CONSENT_STATEMENT} customerName={c.customerName} mode={c.esignProvider} />}
           <p className="mt-4 text-center text-[14px]">
             <a href={`/api/sign/${token}/document`} target="_blank" className="font-medium text-bronze-dark hover:underline">Download this agreement as a PDF</a>
           </p>

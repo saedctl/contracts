@@ -5,7 +5,8 @@ import { config } from "../config";
 // Minimal Dropbox Sign (formerly HelloSign) API v3 client.
 // Docs: https://developers.hellosign.com/api/reference/
 
-const BASE = "https://api.hellosign.com/v3";
+// Overridable only so the integration can be exercised against a local stub in tests.
+const BASE = (process.env.DROPBOX_SIGN_API_BASE || "https://api.hellosign.com/v3").replace(/\/$/, "");
 
 export class DropboxSignError extends Error {
   constructor(message: string, public status: number, public errorName?: string) {
@@ -62,7 +63,7 @@ export interface DSSignatureRequest {
   [key: string]: unknown;
 }
 
-export async function createEmbeddedSignatureRequest(input: {
+export interface SignatureRequestInput {
   pdf: Uint8Array;
   filename: string;
   title: string;
@@ -71,10 +72,21 @@ export async function createEmbeddedSignatureRequest(input: {
   signerName: string;
   signerEmail: string;
   metadata: Record<string, string>;
-}): Promise<{ signatureRequestId: string; signatureId: string; raw: DSSignatureRequest }> {
+}
+
+/**
+ * Creates a signature request.
+ *  - "embedded": signed inside our page (create_embedded; needs API Standard+ and a client ID).
+ *  - "hosted": Dropbox Sign emails the signer, who signs on Dropbox Sign's site (send; works on
+ *    API Essentials). Events for these arrive on the ACCOUNT callback URL.
+ */
+export async function createSignatureRequest(
+  input: SignatureRequestInput,
+  mode: "embedded" | "hosted",
+): Promise<{ signatureRequestId: string; signatureId: string; raw: DSSignatureRequest }> {
   const { clientId, testMode } = creds();
   const form = new FormData();
-  form.append("client_id", clientId);
+  if (mode === "embedded") form.append("client_id", clientId);
   form.append("test_mode", testMode ? "1" : "0");
   form.append("title", input.title);
   form.append("subject", input.subject);
@@ -93,12 +105,20 @@ export async function createEmbeddedSignatureRequest(input: {
   form.append("allow_decline", "1");
   for (const [k, v] of Object.entries(input.metadata)) form.append(`metadata[${k}]`, v);
 
-  const res = await call("/signature_request/create_embedded", { method: "POST", body: form });
+  const endpoint = mode === "embedded" ? "/signature_request/create_embedded" : "/signature_request/send";
+  const res = await call(endpoint, { method: "POST", body: form });
   const body = (await res.json()) as { signature_request: DSSignatureRequest };
   const sr = body.signature_request;
   const signatureId = sr.signatures?.[0]?.signature_id;
   if (!signatureId) throw new Error("Dropbox Sign did not return a signature id");
   return { signatureRequestId: sr.signature_request_id, signatureId, raw: sr };
+}
+
+/** Hosted mode: asks Dropbox Sign to email the signer their signing link again (max ~1/hour). */
+export async function remindSigner(signatureRequestId: string, email: string): Promise<void> {
+  const form = new FormData();
+  form.append("email_address", email);
+  await call(`/signature_request/remind/${encodeURIComponent(signatureRequestId)}`, { method: "POST", body: form });
 }
 
 /** Short-lived URL for the embedded signing iframe. Must be fetched fresh for each session. */

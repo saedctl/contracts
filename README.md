@@ -67,6 +67,16 @@ To try the customer side, open a sent contract, click **Copy signing link** and 
    - Copy the **Client ID** into `DROPBOX_SIGN_CLIENT_ID`.
 4. Keep `DROPBOX_SIGN_TEST_MODE=true` while you test. Test-mode documents are watermarked by Dropbox Sign and are **not legally binding**. Set it to `false` to go live.
 
+#### Hosted mode (Dropbox Sign API Essentials)
+
+Embedded signing, where customers sign inside your page, needs Dropbox Sign's **API Standard** plan. To use the cheaper **API Essentials** plan instead:
+
+1. In Netlify, set `DROPBOX_SIGN_MODE=hosted`. `DROPBOX_SIGN_CLIENT_ID` isn't needed in this mode.
+2. In Dropbox Sign, go to **Settings → API** and set the **Account callback** URL to `https://<your-site>/api/webhooks/dropbox-sign`. Hosted requests report events to the account callback, not the API app's.
+3. Redeploy.
+
+When a contract is sent, Dropbox Sign emails the customer a signing link, and your branded email tells them to expect it. Your contract page shows the agreement, with a **Send me the signing email again** button. Status updates, the signed PDF and the confirmation emails work as in embedded mode. Each contract keeps the mode it was sent with.
+
 ### 3. Resend
 
 1. Add and verify your sending domain at https://resend.com/domains (SPF/DKIM DNS records).

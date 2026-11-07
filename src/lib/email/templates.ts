@@ -36,21 +36,30 @@ ${esc(BRAND.name)} is operated by ${esc(BRAND.legalName)} · <a href="${BRAND.we
 </td></tr></table></td></tr></table></body></html>`;
 }
 
-export function signatureRequestEmail(opts: { customerName: string; url: string; expiresOn: string; demo: boolean }) {
+export function signatureRequestEmail(opts: { customerName: string; url: string; expiresOn: string; demo: boolean; hosted?: boolean }) {
   const subject = "Your Engineers Club Membership Agreement";
-  const paragraphs = [
-    `Hi ${opts.customerName},`,
-    "Welcome to The Engineers Club!",
-    "Please review and sign your membership agreement using the secure link below.",
-  ];
+  const paragraphs = opts.hosted
+    ? [
+        `Hi ${opts.customerName},`,
+        "Welcome to The Engineers Club!",
+        "Your membership agreement is ready. You'll receive a separate email from Dropbox Sign, our secure e-signature provider, with a link to sign it.",
+        "You can review the full agreement any time using the button below.",
+      ]
+    : [
+        `Hi ${opts.customerName},`,
+        "Welcome to The Engineers Club!",
+        "Please review and sign your membership agreement using the secure link below.",
+      ];
   const after = [
     "Once signed, you'll receive a copy of your completed agreement for your records.",
-    `This link is personal to you and expires on ${opts.expiresOn}. If the button doesn't work, copy this address into your browser: ${opts.url}`,
+    opts.hosted
+      ? `Can't find the Dropbox Sign email? Check your spam folder, or open the agreement and use "Send me the signing email again". Review link: ${opts.url}`
+      : `This link is personal to you and expires on ${opts.expiresOn}. If the button doesn't work, copy this address into your browser: ${opts.url}`,
   ];
   return {
     subject,
-    html: layout({ preheader: "Please review and sign your membership agreement.", paragraphs, button: { label: "Review & sign agreement", url: opts.url }, afterButton: after, demo: opts.demo }),
-    text: [...paragraphs, "", `Review and sign: ${opts.url}`, "", ...after, "", "Best regards,", "The Engineers Club Team"].join("\n"),
+    html: layout({ preheader: "Please review and sign your membership agreement.", paragraphs, button: { label: opts.hosted ? "Review agreement" : "Review & sign agreement", url: opts.url }, afterButton: after, demo: opts.demo }),
+    text: [...paragraphs, "", `${opts.hosted ? "Review" : "Review and sign"}: ${opts.url}`, "", ...after, "", "Best regards,", "The Engineers Club Team"].join("\n"),
   };
 }
 

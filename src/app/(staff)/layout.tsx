@@ -5,6 +5,7 @@ import { BRAND } from "@/lib/brand";
 import { logoutAction } from "@/app/actions/auth";
 import { AppNav } from "@/components/AppNav";
 import { DemoBanner } from "@/components/DemoBanner";
+import { TestModeBanner } from "@/components/TestModeBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   return (
     <div className="flex min-h-full flex-1 flex-col">
       {config.demoMode && <DemoBanner />}
+      <TestModeBanner isAdmin={user.role === "admin"} />
       <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
           <Link href="/dashboard" className="mr-auto flex flex-col leading-tight sm:mr-0">
