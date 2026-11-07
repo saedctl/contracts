@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ContractStatus } from "@/lib/types";
-import { Alert, Button, Spinner } from "@/components/ui";
+import { Alert, Button, ButtonLink, Spinner } from "@/components/ui";
 
 type Action = "send" | "resend" | "link" | "refresh" | "delete";
 
@@ -53,6 +53,7 @@ export function ContractActions({ id, status, provider, hasSigned }: { id: strin
       <div className="flex flex-wrap gap-2">
         {status === "draft" && (
           <>
+            <ButtonLink href={`/contracts/${id}/edit`} variant="secondary">Edit draft</ButtonLink>
             <Button onClick={() => run("send")} disabled={!!busy}>{busy === "send" && <Spinner />} Send for signature</Button>
             <Button variant="danger" onClick={() => run("delete", "Delete this draft? This can't be undone.")} disabled={!!busy}>Delete draft</Button>
           </>

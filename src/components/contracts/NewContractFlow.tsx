@@ -10,13 +10,14 @@ import { Alert, Button, ButtonLink, Card, Field, Spinner, cx } from "@/component
 import { ContractDocument, PaperSheet } from "@/components/ContractDocument";
 
 type Step = "details" | "review" | "sent";
-type Values = {
+export type ContractFormState = {
   customerName: string; customerEmail: string; customerPhone: string;
   membershipTier: MembershipTier | ""; duration: string; startDate: string; endDate: string;
   amountPaid: string; currency: "GBP" | "USD"; paymentStatus: "paid_in_full" | "deposit_paid" | "payment_plan";
   paymentSchedule: string; outstandingBalance: string; balanceDueDate: string;
   instalments: { amount: string; dueDate: string }[];
 };
+type Values = ContractFormState;
 type Preview = { doc: ContractDoc; templateVersion: number; templateTitle: string; isSample: boolean };
 type Sent = { id: string; reference: string; customerEmail: string; emailSimulated: boolean; demo: boolean };
 
@@ -35,17 +36,20 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "sent", label: "Send for signature" },
 ];
 
-export function NewContractFlow({ today }: { today: string }) {
+export function NewContractFlow({ today, draft }: { today: string; draft?: { id: string; reference: string; values: ContractFormState } }) {
   const [step, setStep] = useState<Step>("details");
-  const [v, setV] = useState<Values>({
+  const [v, setV] = useState<Values>(draft?.values ?? {
     customerName: "", customerEmail: "", customerPhone: "",
     membershipTier: "", duration: "", startDate: today, endDate: "",
     amountPaid: "", currency: "GBP", paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "",
     instalments: [],
   });
+  // Once saved, the draft is updated in place rather than creating another contract.
+  const [draftRef, setDraftRef] = useState<{ id: string; reference: string } | null>(draft ? { id: draft.id, reference: draft.reference } : null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<{ message: string; contractId?: string } | null>(null);
-  const [busy, setBusy] = useState<"preview" | "send" | "pdf" | null>(null);
+  const [busy, setBusy] = useState<"preview" | "send" | "pdf" | "draft" | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [sent, setSent] = useState<Sent | null>(null);
 
@@ -108,6 +112,32 @@ export function NewContractFlow({ today }: { today: string }) {
     return { res, data };
   }
 
+  async function put(url: string, body: unknown) {
+    const res = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
+    return { res, data };
+  }
+
+  async function saveDraft() {
+    const input = parsed();
+    if (!input) return;
+    setBusy("draft");
+    try {
+      const { res, data } = draftRef
+        ? await put(`/api/contracts/${draftRef.id}`, { input, send: false })
+        : await post("/api/contracts", { input, send: false });
+      if (!res.ok) return handleFailure(data);
+      setDraftRef({ id: data.id, reference: data.reference });
+      setSavedAt(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
+      // Keep the address bar on the draft so a refresh doesn't start a new contract.
+      if (!draft) window.history.replaceState(null, "", `/contracts/${data.id}/edit`);
+    } catch {
+      handleFailure(null);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function handleFailure(data: { error?: string; fieldErrors?: FieldErrors; contractId?: string } | null) {
     if (data?.fieldErrors) {
       setErrors(data.fieldErrors);
@@ -158,8 +188,13 @@ export function NewContractFlow({ today }: { today: string }) {
     if (!input) return;
     setBusy("send");
     try {
-      const { res, data } = await post("/api/contracts", { input, send: true });
-      if (!res.ok) return handleFailure(data);
+      const { res, data } = draftRef
+        ? await put(`/api/contracts/${draftRef.id}`, { input, send: true })
+        : await post("/api/contracts", { input, send: true });
+      if (!res.ok) {
+        if (data?.contractId && !draftRef) setDraftRef({ id: data.contractId, reference: "" });
+        return handleFailure(data);
+      }
       setSent(data);
       setStep("sent");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -192,7 +227,8 @@ export function NewContractFlow({ today }: { today: string }) {
     <div className="mx-auto max-w-3xl">
       <div className="mb-8">
         <Link href="/dashboard" className="text-[14px] text-muted hover:text-ink">← Back to contracts</Link>
-        <h1 className="mt-3 font-serif text-[28px] font-semibold sm:text-[32px]">Create New Contract</h1>
+        <h1 className="mt-3 font-serif text-[28px] font-semibold sm:text-[32px]">{draftRef ? "Edit Draft Contract" : "Create New Contract"}</h1>
+        {draftRef?.reference && <p className="mt-1 text-[14px] text-muted">{draftRef.reference} · Draft — not sent to the customer yet</p>}
         <ol className="mt-5 grid grid-cols-3 gap-2" aria-label="Progress">
           {STEPS.map((s, i) => {
             const idx = STEPS.findIndex((x) => x.key === step);
@@ -209,11 +245,17 @@ export function NewContractFlow({ today }: { today: string }) {
         </ol>
       </div>
 
+      {savedAt && draftRef && step !== "sent" && (
+        <Alert tone="success" className="mb-6">
+          Draft saved at {savedAt}. It&apos;s on the dashboard as <strong>Draft</strong>; you can come back to it and send it whenever you&apos;re ready.{" "}
+          <Link className="font-medium underline" href={`/contracts/${draftRef.id}`}>Open draft</Link>
+        </Alert>
+      )}
       {formError && (
         <Alert tone="error" className="mb-6">
           {formError.message}
           {formError.contractId && (
-            <> The contract was saved as a draft — <Link className="font-medium underline" href={`/contracts/${formError.contractId}`}>open it to retry</Link>.</>
+            <> The contract was saved as a draft — <Link className="font-medium underline" href={`/contracts/${formError.contractId}`}>open it</Link> or try again here.</>
           )}
         </Alert>
       )}
@@ -353,7 +395,13 @@ export function NewContractFlow({ today }: { today: string }) {
             )}
           </Card>
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+            {savedAt && busy !== "draft" && (
+              <span role="status" className="text-center text-[13.5px] text-emerald-800 sm:mr-1">✓ Draft saved {savedAt}</span>
+            )}
+            <Button type="button" variant="ghost" onClick={saveDraft} disabled={!!busy} className="py-3">
+              {busy === "draft" && <Spinner />} {busy === "draft" ? "Saving…" : "Save as draft"}
+            </Button>
             <Button type="submit" variant="secondary" disabled={!!busy} className="py-3">
               {busy === "preview" && <Spinner />} Preview Contract
             </Button>
@@ -382,6 +430,9 @@ export function NewContractFlow({ today }: { today: string }) {
           </PaperSheet>
           <div className="sticky bottom-4 z-10 flex flex-col-reverse gap-3 rounded-2xl border border-line bg-white/95 p-3 shadow-pop backdrop-blur sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setStep("details")} disabled={!!busy}>Back</Button>
+            <Button variant="secondary" onClick={saveDraft} disabled={!!busy} className="py-3">
+              {busy === "draft" && <Spinner />} {busy === "draft" ? "Saving…" : "Save as draft"}
+            </Button>
             <Button onClick={doSend} disabled={!!busy} className="py-3">
               {busy === "send" && <Spinner />} {busy === "send" ? "Generating & sending…" : "Generate & Send for Signature"}
             </Button>
@@ -405,7 +456,7 @@ export function NewContractFlow({ today }: { today: string }) {
           <p className="mt-3 text-[13px] text-muted">Reference {sent.reference}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <ButtonLink href={`/contracts/${sent.id}`} variant="secondary">View contract</ButtonLink>
-            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "", instalments: [] })); setSent(null); setPreview(null); setStep("details"); }}>+ Create another</Button>
+            <Button onClick={() => { setV((p) => ({ ...p, customerName: "", customerEmail: "", customerPhone: "", membershipTier: "", amountPaid: "", paymentSchedule: "", outstandingBalance: "", balanceDueDate: "", instalments: [] })); setSent(null); setPreview(null); setDraftRef(null); setSavedAt(null); window.history.replaceState(null, "", "/contracts/new"); setStep("details"); }}>+ Create another</Button>
           </div>
         </Card>
       )}

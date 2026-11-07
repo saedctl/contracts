@@ -41,6 +41,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "contract.confirmation_sent": "Signed copy emailed",
   "contract.downloaded": "Document downloaded",
   "contract.draft_deleted": "Draft deleted",
+  "contract.draft_updated": "Draft edited",
   "contract.deleted": "Contract deleted by an administrator",
   "payment.balance_collected": "Payment marked as collected",
   "payment.balance_uncollected": "Payment collection undone",
