@@ -15,6 +15,7 @@ import { buildFieldValues } from "./fields";
 import { buildDoc, companySignatureFields, getCompanySignatureSetting } from "./document";
 import { templateForTier } from "./templates";
 import { audit } from "./audit";
+import { rateLimit } from "../rate-limit";
 
 import { UserFacingError } from "../errors";
 export { UserFacingError };
@@ -211,10 +212,16 @@ function linkExpiry(): string {
   return new Date(Date.now() + config.linkTtlDays * 86400_000).toISOString();
 }
 
+/** True when the customer signs on Dropbox Sign's own site (hosted mode) for this contract. */
+export function isHostedSigning(c: Contract): boolean {
+  return (c.providerData as { signingMode?: string } | null)?.signingMode === "hosted";
+}
+
 async function deliverSigningEmail(contract: Contract, attempt: string) {
   const url = signingUrl(contract);
   const email = signatureRequestEmail({
     customerName: contract.customerName, url, expiresOn: formatLongDate(contract.linkExpiresAt!.slice(0, 10)), demo: contract.isDemo,
+    hosted: isHostedSigning(contract),
   });
   return sendEmail({ ...email, to: contract.customerEmail, kind: "signature_request", contractId: contract.id, idempotencyKey: `sigreq:${contract.id}:${attempt}` });
 }
@@ -230,8 +237,9 @@ export async function sendContract(user: StaffUser, contract: Contract, meta: Re
   if (c.esignProvider === "dropbox_sign" && !c.providerRequestId) {
     const pdf = await store.getFile(c.documentPath!);
     if (!pdf || sha256Hex(pdf) !== c.documentSha256) throw new Error("Stored agreement is missing or does not match its fingerprint.");
+    const mode = config.dropboxSign?.mode ?? "embedded";
     try {
-      const res = await ds.createEmbeddedSignatureRequest({
+      const res = await ds.createSignatureRequest({
         pdf,
         filename: `${c.reference} Membership Agreement.pdf`,
         title: `Membership Agreement ${c.reference}`,
@@ -240,8 +248,12 @@ export async function sendContract(user: StaffUser, contract: Contract, meta: Re
         signerName: c.customerName,
         signerEmail: c.customerEmail,
         metadata: { contract_id: c.id, reference: c.reference, document_sha256: c.documentSha256 ?? "" },
+      }, mode);
+      c = await store.updateContract(c.id, {
+        providerRequestId: res.signatureRequestId,
+        providerSignatureId: res.signatureId,
+        providerData: { ...(c.providerData ?? {}), signingMode: mode },
       });
-      c = await store.updateContract(c.id, { providerRequestId: res.signatureRequestId, providerSignatureId: res.signatureId });
     } catch (e) {
       await audit(c.id, { type: "provider", label: "Dropbox Sign" }, "provider.error", { stage: "create", message: (e as Error).message });
       throw new UserFacingError(`The e-signature provider rejected the request: ${(e as Error).message}`);
@@ -265,10 +277,39 @@ export async function resendContract(user: StaffUser, contract: Contract, meta: 
     linkExpiresAt: linkExpiry(),
     status: contract.status === "expired" ? "sent" : contract.status,
   });
+  // Hosted mode: also ask Dropbox Sign to email its signing link again.
+  let providerReminder: "sent" | "failed" | "n/a" = "n/a";
+  if (isHostedSigning(c) && c.providerRequestId) {
+    try {
+      await ds.remindSigner(c.providerRequestId, c.customerEmail);
+      providerReminder = "sent";
+    } catch (e) {
+      providerReminder = "failed";
+      await audit(c.id, { type: "provider", label: "Dropbox Sign" }, "provider.error", { stage: "remind", message: (e as Error).message });
+    }
+  }
   const result = await deliverSigningEmail(c, c.linkNonce);
   c = await store.updateContract(c.id, { sentAt: new Date().toISOString() });
-  await audit(c.id, { type: "staff", user }, "contract.resent", { to: c.customerEmail, emailSimulated: result.simulated }, meta);
+  await audit(c.id, { type: "staff", user }, "contract.resent", { to: c.customerEmail, emailSimulated: result.simulated, providerReminder }, meta);
   return c;
+}
+
+/**
+ * Hosted mode, from the customer's review page: Dropbox Sign emails the signing link again.
+ * Limited to once every 15 minutes per contract (Dropbox Sign also limits reminders).
+ */
+export async function customerRequestSigningEmail(c: Contract, meta: RequestMeta): Promise<void> {
+  if (!isHostedSigning(c) || !c.providerRequestId) throw new UserFacingError("Signing happens on this page.");
+  if (c.status !== "sent" && c.status !== "viewed") throw new UserFacingError("This agreement is no longer awaiting signature.");
+  const limit = rateLimit(`remind:${c.id}`, 1, 15 * 60_000);
+  if (!limit.ok) throw new UserFacingError(`We've just sent it. Please check your inbox (and spam folder), or try again in ${Math.ceil(limit.retryAfterSec / 60)} minutes.`);
+  try {
+    await ds.remindSigner(c.providerRequestId, c.customerEmail);
+  } catch (e) {
+    await audit(c.id, { type: "provider", label: "Dropbox Sign" }, "provider.error", { stage: "remind", message: (e as Error).message });
+    throw new UserFacingError("We couldn't resend the signing email just now. Please try again later or reply to our email for help.");
+  }
+  await audit(c.id, { type: "customer", label: c.customerEmail }, "contract.signing_email_requested", {}, meta);
 }
 
 export async function copySigningLink(user: StaffUser, contract: Contract, meta: RequestMeta): Promise<string> {
@@ -392,6 +433,7 @@ export async function startSigning(c: Contract, meta: RequestMeta): Promise<{ mo
   }, meta);
 
   if (c.esignProvider === "demo") return { mode: "demo" };
+  if (isHostedSigning(c)) throw new UserFacingError("Please sign using the link in the email from Dropbox Sign.");
   if (!c.providerSignatureId || !config.dropboxSign) throw new UserFacingError("Signing is temporarily unavailable. Please try again later.");
   try {
     const signUrl = await ds.getEmbeddedSignUrl(c.providerSignatureId);

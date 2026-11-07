@@ -33,6 +33,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "contract.viewed": "Opened by customer",
   "contract.consent_given": "Customer consented to sign electronically",
   "contract.signing_started": "Customer opened the signing panel",
+  "contract.signing_email_requested": "Customer asked for the Dropbox Sign email again",
   "contract.signed": "Signature completed (provider verified)",
   "contract.signed_demo": "Simulated signature (demo — not legally binding)",
   "contract.declined": "Declined by customer",

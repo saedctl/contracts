@@ -28,11 +28,22 @@ const supabase =
     ? { url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY, serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY }
     : null;
 
+/**
+ * How customers sign with Dropbox Sign:
+ *  - "embedded" (default): inside our own signing page. Needs the API Standard plan or higher
+ *    and an API app (DROPBOX_SIGN_CLIENT_ID).
+ *  - "hosted": Dropbox Sign emails the customer, who signs on Dropbox Sign's site. Works on
+ *    the API Essentials plan; no client ID needed.
+ */
+const dropboxSignMode: "embedded" | "hosted" =
+  (env.DROPBOX_SIGN_MODE ?? "").trim().replace(/^["']|["']$/g, "").trim().toLowerCase() === "hosted" ? "hosted" : "embedded";
+
 const dropboxSign =
-  env.DROPBOX_SIGN_API_KEY && env.DROPBOX_SIGN_CLIENT_ID
+  env.DROPBOX_SIGN_API_KEY && (env.DROPBOX_SIGN_CLIENT_ID || dropboxSignMode === "hosted")
     ? {
         apiKey: env.DROPBOX_SIGN_API_KEY,
-        clientId: env.DROPBOX_SIGN_CLIENT_ID,
+        clientId: env.DROPBOX_SIGN_CLIENT_ID || "",
+        mode: dropboxSignMode,
         // Test mode is free and produces non-binding documents. Must be explicitly disabled for live use.
         testMode: !isFalse(env.DROPBOX_SIGN_TEST_MODE),
       }
@@ -79,7 +90,7 @@ export function integrationStatus(): IntegrationStatus[] {
       name: "E-signature (Dropbox Sign)",
       configured: !!dropboxSign,
       simulated: !dropboxSign,
-      missing: ["DROPBOX_SIGN_API_KEY", "DROPBOX_SIGN_CLIENT_ID"].filter((k) => !env[k]),
+      missing: (dropboxSignMode === "hosted" ? ["DROPBOX_SIGN_API_KEY"] : ["DROPBOX_SIGN_API_KEY", "DROPBOX_SIGN_CLIENT_ID"]).filter((k) => !env[k]),
     },
     {
       name: "Email (Resend)",

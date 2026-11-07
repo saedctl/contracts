@@ -61,6 +61,8 @@ export async function seedDemo(store: DemoStore) {
     paymentStatus: "paid_in_full", paymentSchedule: "", outstandingBalance: 0, balanceDueDate: "", instalments: [],
   });
 
+  // Example signed contracts are simulated, so only seed them when no real e-signature provider is set.
+  if (config.dropboxSign) return;
   try {
     const john = await createContract(sales, make("John Smith", "john.smith@example.com", 499, 6), seedMeta);
     const sentJohn = await sendContract(sales, john, seedMeta);
