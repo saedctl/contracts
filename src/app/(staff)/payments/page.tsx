@@ -8,6 +8,7 @@ import { Card, cx } from "@/components/ui";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
 import { MonthlyCashflow } from "@/components/payments/MonthlyCashflow";
+import { PeriodSelect } from "@/components/payments/PeriodSelect";
 
 export const metadata: Metadata = { title: "Payments" };
 
@@ -41,6 +42,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const user = await requireUser();
   const sp = await searchParams;
   const view: View = VIEWS.some((v) => v.key === sp.view) ? (sp.view as View) : "outstanding";
+  // Monthly is the default summary; "All time" shows the overall totals.
+  const period: "month" | "all" = sp.period === "all" ? "all" : "month";
   const q = (sp.q ?? "").slice(0, 100);
   const today = todayISO();
 
@@ -59,7 +62,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     settled: rows.filter((r) => r.state === "collected" || r.state === "paid_in_full").length,
     all: rows.length,
   };
-  const href = (v: View) => `/payments?view=${v}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const href = (v: View) => `/payments?view=${v}${q ? `&q=${encodeURIComponent(q)}` : ""}${period === "all" ? "&period=all" : ""}`;
   const isAdmin = user.role === "admin";
 
   return (
@@ -70,14 +73,31 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <p className="mt-2 max-w-2xl text-[15px] leading-6 text-muted">Cash collected and still to collect on signed contracts. Mark each payment as collected once the money arrives; the full plan is on each contract&apos;s page.</p>
       </div>
 
-      <PaymentSummary totals={totals} />
-
-      <MonthlyCashflow contracts={q ? await listContractsForStaff(user, { status: "signed" }) : signed} today={today} isAdmin={isAdmin} />
+      {period === "month" ? (
+        <MonthlyCashflow
+          contracts={q ? await listContractsForStaff(user, { status: "signed" }) : signed}
+          today={today}
+          isAdmin={isAdmin}
+          headerRight={<PeriodSelect value="month" />}
+        />
+      ) : (
+        <section className="space-y-4" aria-labelledby="all-time-cash">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="all-time-cash" className="font-serif text-[22px] font-semibold">All-time cash</h2>
+              <p className="text-[14px] text-muted">Everything collected and still to collect across all signed contracts.</p>
+            </div>
+            <PeriodSelect value="all" />
+          </div>
+          <PaymentSummary totals={totals} />
+        </section>
+      )}
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:p-5">
           <form className="relative flex-1" role="search" action="/payments">
             <input type="hidden" name="view" value={view} />
+            {period === "all" && <input type="hidden" name="period" value="all" />}
             <label htmlFor="q" className="sr-only">Search members</label>
             <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <input id="q" name="q" defaultValue={q} placeholder="Search by name, email or reference" className="field-input pl-9" />
