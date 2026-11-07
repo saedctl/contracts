@@ -223,6 +223,13 @@ export class DemoStore implements Store {
       d.contracts = d.contracts.filter((x) => x.id !== id);
     });
   }
+  /** Demo data only: moves an example contract's dates into the past so history charts have data. */
+  async demoBackdate(id: string, patch: Partial<Pick<Contract, "createdAt" | "sentAt" | "signedAt" | "instalments">>) {
+    await this.mutate((d) => {
+      const c = d.contracts.find((x) => x.id === id);
+      if (c) Object.assign(c, patch);
+    });
+  }
   async anonymiseContract(id: string) {
     await this.mutate((d) => {
       const c = d.contracts.find((x) => x.id === id);

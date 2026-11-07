@@ -7,6 +7,7 @@ import { formatMoney, formatShortDate, todayISO } from "@/lib/utils";
 import { Card, cx } from "@/components/ui";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
+import { MonthlyCashflow } from "@/components/payments/MonthlyCashflow";
 
 export const metadata: Metadata = { title: "Payments" };
 
@@ -70,6 +71,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <PaymentSummary totals={totals} />
+
+      <MonthlyCashflow contracts={q ? await listContractsForStaff(user, { status: "signed" }) : signed} today={today} isAdmin={isAdmin} />
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:p-5">
