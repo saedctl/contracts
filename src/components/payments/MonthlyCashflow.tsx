@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { addMonths, cashEvents, mainCurrency, monthKey, monthName, monthlySeries, summarise, type CashEvent } from "@/lib/cashflow";
 import type { Contract } from "@/lib/types";
 import { formatMoney, formatShortDate } from "@/lib/utils";
@@ -38,9 +39,19 @@ function EventList({ title, empty, events, due, canUndo }: { title: string; empt
 }
 
 /** "This month vs next month" view of cash, with the contracts behind each number. */
-export function MonthlyCashflow({ contracts, today, isAdmin }: { contracts: Contract[]; today: string; isAdmin: boolean }) {
+export function MonthlyCashflow({ contracts, today, isAdmin, headerRight }: { contracts: Contract[]; today: string; isAdmin: boolean; headerRight?: ReactNode }) {
   const events = cashEvents(contracts, today);
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    return (
+      <section className="space-y-4" aria-labelledby="monthly-cash">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 id="monthly-cash" className="font-serif text-[22px] font-semibold">Monthly cash</h2>
+          {headerRight}
+        </div>
+        <Card className="p-5 text-[14px] text-muted">No signed contracts yet — payments appear here once customers sign.</Card>
+      </section>
+    );
+  }
   const currency = mainCurrency(events);
   const thisMonth = monthKey(today);
   const lastMonth = addMonths(thisMonth, -1);
@@ -62,7 +73,10 @@ export function MonthlyCashflow({ contracts, today, isAdmin }: { contracts: Cont
           <h2 id="monthly-cash" className="font-serif text-[22px] font-semibold">Monthly cash</h2>
           <p className="text-[14px] text-muted">{monthName(thisMonth)} so far, against what&apos;s due in {monthName(nextMonth, true).split(" ")[0]}.</p>
         </div>
-        {otherCurrencies.length > 0 && <p className="text-[12.5px] text-muted">Showing {currency}. {otherCurrencies.join(", ")} payments are in the table below.</p>}
+        <div className="flex flex-col items-end gap-1">
+          {headerRight}
+          {otherCurrencies.length > 0 && <p className="text-[12.5px] text-muted">Showing {currency}. {otherCurrencies.join(", ")} payments are in the table below.</p>}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
