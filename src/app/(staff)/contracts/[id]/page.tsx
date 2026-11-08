@@ -191,6 +191,9 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
                     {formatDateTime(e.createdAt)} · {e.actorType === "staff" ? e.actorLabel : e.actorType === "customer" ? "Customer" : e.actorType === "provider" ? e.actorLabel : "System"}
                     {e.event === "provider.event" && ` · ${String(e.details.eventType)}`}
                   </p>
+                  {e.event === "contract.fx_rate_recorded" && (
+                    <p className="text-[12.5px] text-muted">{String(e.details.rate)} on {String(e.details.rateDate)} (signing date) · {String(e.details.source)}</p>
+                  )}
                 </li>
               ))}
               {events.length === 0 && <li className="text-[14px] text-muted">No activity yet.</li>}

@@ -15,6 +15,7 @@ import { buildFieldValues } from "./fields";
 import { buildDoc, companySignatureFields, getCompanySignatureSetting } from "./document";
 import { templateForTier } from "./templates";
 import { audit } from "./audit";
+import { fxRatesFor } from "./fx";
 import { rateLimit } from "../rate-limit";
 
 import { UserFacingError } from "../errors";
@@ -640,5 +641,7 @@ export async function runMaintenance() {
     }
     if ((await expireIfDue(c)).status !== c.status) expired++;
   }
+  // Look up GBP rates for newly signed non-GBP contracts ahead of the next dashboard visit.
+  await fxRatesFor(await store.listContracts({ status: "signed", limit: 100_000 }));
   return { expired, deleted, anonymised, reconciled };
 }

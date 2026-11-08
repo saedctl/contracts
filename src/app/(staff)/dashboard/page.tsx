@@ -9,6 +9,7 @@ import { MEMBERSHIP_TIERS } from "@/lib/types";
 import { paymentRow, paymentTotals } from "@/lib/payments";
 import { todayISO } from "@/lib/utils";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
+import { fxRatesFor } from "@/lib/services/fx";
 import { getStore } from "@/lib/db";
 import { CONTRACT_STATUSES, type ContractStatus } from "@/lib/types";
 import { formatMoney, formatDateTime } from "@/lib/utils";
@@ -28,6 +29,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ]);
   const contracts = status ? all.filter((c) => c.status === status) : all;
   const counts = Object.fromEntries(CONTRACT_STATUSES.map((s) => [s, all.filter((c) => c.status === s).length])) as Record<ContractStatus, number>;
+  const signedAll = all.filter((c) => c.status === "signed" && !c.anonymisedAt);
+  const rates = !q && !status ? await fxRatesFor(signedAll) : {};
   const blockers = productionBlockers();
   const isAdmin = user.role === "admin";
   const qs = (s?: string) => {
@@ -75,7 +78,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {!q && !status && (
         <PaymentSummary
-          totals={paymentTotals(all.filter((c) => c.status === "signed" && !c.anonymisedAt).map((c) => paymentRow(c, todayISO())), todayISO())}
+          totals={paymentTotals(signedAll.map((c) => paymentRow(c, todayISO())), todayISO(), rates)}
           link
         />
       )}
