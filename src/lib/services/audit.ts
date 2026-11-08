@@ -46,6 +46,7 @@ export const EVENT_LABELS: Record<string, string> = {
   "contract.deleted": "Contract deleted by an administrator",
   "payment.balance_collected": "Payment marked as collected",
   "payment.balance_uncollected": "Payment collection undone",
+  "contract.fx_rate_recorded": "Exchange rate to GBP recorded",
   "contract.anonymised": "Personal data erased (retention)",
   "provider.event": "E-signature provider event",
   "provider.error": "E-signature provider error",

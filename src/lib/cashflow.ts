@@ -1,6 +1,7 @@
 // Month-by-month cash view of signed contracts: what was collected when, and what is due when.
 // Pure (usable on server and client).
 
+import { REPORTING_CURRENCY, fxOf, toReporting, type FxRates } from "./fx";
 import { planOf } from "./payments";
 import type { Contract, Currency } from "./types";
 
@@ -17,6 +18,8 @@ export interface CashEvent {
   state: "collected" | "due" | "overdue";
   /** Set for amounts still owed, so they can be marked collected. */
   instalmentId?: string;
+  /** For contracts in another currency: the contract amount and the remembered rate used. */
+  original?: { amount: number; currency: Currency; rate: number; rateDate: string };
 }
 
 export interface MonthBucket {
@@ -47,33 +50,46 @@ export function monthName(key: string, long = true): string {
   return long ? `${MONTHS[m - 1]} ${y}` : MONTHS[m - 1].slice(0, 3);
 }
 
-/** Every payment of every signed contract, as dated events. */
-export function cashEvents(contracts: Contract[], today: string): CashEvent[] {
+/**
+ * Every payment of every signed contract, as dated events in GBP. Contracts in another currency
+ * are converted at the rate remembered for the day they were signed; one whose rate hasn't been
+ * recorded yet keeps its own currency (so it is left out of GBP totals rather than guessed).
+ */
+export function cashEvents(contracts: Contract[], today: string, rates: FxRates = {}): CashEvent[] {
   const events: CashEvent[] = [];
   for (const c of contracts) {
     if (c.status !== "signed" || c.anonymisedAt) continue;
-    const base = { contractId: c.id, customerName: c.customerName, reference: c.reference, currency: c.currency };
+    const fx = fxOf(c, rates);
+    const reportable = c.currency === REPORTING_CURRENCY || !!fx;
+    const base = { contractId: c.id, customerName: c.customerName, reference: c.reference, currency: reportable ? REPORTING_CURRENCY : c.currency };
+    const push = (e: Omit<CashEvent, keyof typeof base | "original">) =>
+      events.push({
+        ...base,
+        ...e,
+        amount: reportable ? toReporting(e.amount, c, rates)! : e.amount,
+        ...(fx ? { original: { amount: e.amount, currency: c.currency, rate: fx.rate, rateDate: fx.rateDate } } : {}),
+      });
     if (c.amountPaid > 0) {
-      events.push({ ...base, amount: c.amountPaid, date: c.amountPaidOn ?? c.createdAt.slice(0, 10), label: "Upfront payment", state: "collected" });
+      push({ amount: c.amountPaid, date: c.amountPaidOn ?? c.createdAt.slice(0, 10), label: "Upfront payment", state: "collected" });
     }
     const plan = planOf(c, today);
     plan.forEach((it, i) => {
       const label = plan.length > 1 ? `Instalment ${i + 1} of ${plan.length}` : "Balance";
       if (it.collectedAt) {
-        events.push({ ...base, amount: it.amount, date: it.collectedAt.slice(0, 10), label, state: "collected" });
+        push({ amount: it.amount, date: it.collectedAt.slice(0, 10), label, state: "collected" });
       } else if (it.dueDate) {
-        events.push({ ...base, amount: it.amount, date: it.dueDate, label, state: it.state === "overdue" ? "overdue" : "due", instalmentId: it.id });
+        push({ amount: it.amount, date: it.dueDate, label, state: it.state === "overdue" ? "overdue" : "due", instalmentId: it.id });
       }
     });
   }
   return events;
 }
 
-/** The currency most contracts use (amounts in different currencies are never added together). */
-export function mainCurrency(events: CashEvent[]): Currency {
-  const counts = new Map<Currency, number>();
-  for (const e of events) counts.set(e.currency, (counts.get(e.currency) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "GBP";
+/** Contracts in another currency: how many are converted to GBP, and how many still await a rate. */
+export function conversionNote(contracts: Contract[], rates: FxRates) {
+  const foreign = contracts.filter((c) => c.status === "signed" && !c.anonymisedAt && c.currency !== REPORTING_CURRENCY);
+  const converted = foreign.filter((c) => fxOf(c, rates));
+  return { converted: converted.length, pending: foreign.length - converted.length, currencies: [...new Set(foreign.map((c) => c.currency))] };
 }
 
 /** Buckets from `back` months ago to `forward` months ahead of the current month. */

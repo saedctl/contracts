@@ -1,5 +1,6 @@
 // Cash collected / to be collected for signed contracts. Pure (usable on server and client).
 
+import { REPORTING_CURRENCY, toReporting, type FxRates } from "./fx";
 import type { Contract, Currency } from "./types";
 
 export type PaymentState = "paid_in_full" | "collected" | "due" | "overdue" | "no_due_date";
@@ -107,6 +108,7 @@ export function paymentRow(c: Contract, today: string): PaymentRow {
 }
 
 export interface PaymentTotals {
+  /** Always GBP: other currencies are converted at the rate remembered when each contract was signed. */
   currency: Currency;
   collected: number;
   toCollect: number;
@@ -114,29 +116,35 @@ export interface PaymentTotals {
   overdueCount: number;
   dueNext30: number;
   contracts: number;
+  /** Signed contracts in another currency included after conversion. */
+  converted: number;
+  /** Signed contracts in another currency still waiting for their exchange rate (not counted). */
+  pendingFx: number;
 }
 
-/** Totals per currency (amounts in different currencies are never added together). */
-export function paymentTotals(rows: PaymentRow[], today: string): PaymentTotals[] {
+/** One set of totals in GBP. Contracts whose exchange rate isn't recorded yet are left out (and counted in pendingFx). */
+export function paymentTotals(rows: PaymentRow[], today: string, rates: FxRates = {}): PaymentTotals {
   const in30 = new Date(Date.parse(today) + 30 * 86400000).toISOString().slice(0, 10);
-  const by = new Map<Currency, PaymentTotals>();
+  const t: PaymentTotals = { currency: REPORTING_CURRENCY, collected: 0, toCollect: 0, overdue: 0, overdueCount: 0, dueNext30: 0, contracts: 0, converted: 0, pendingFx: 0 };
   for (const r of rows) {
-    const cur = r.contract.currency;
-    const t = by.get(cur) ?? { currency: cur, collected: 0, toCollect: 0, overdue: 0, overdueCount: 0, dueNext30: 0, contracts: 0 };
+    const c = r.contract;
+    const gbp = (n: number) => toReporting(n, c, rates) ?? 0;
+    if (c.currency !== REPORTING_CURRENCY) {
+      if (toReporting(1, c, rates) === null) { t.pendingFx++; continue; }
+      t.converted++;
+    }
     t.contracts++;
-    t.collected += r.totalCollected;
-    t.toCollect += r.outstanding;
+    t.collected += gbp(r.totalCollected);
+    t.toCollect += gbp(r.outstanding);
     for (const it of r.plan) {
       if (it.state === "overdue") {
-        t.overdue += it.amount;
+        t.overdue += gbp(it.amount);
         t.overdueCount++;
       }
-      if (it.state === "due" && it.dueDate && it.dueDate <= in30) t.dueNext30 += it.amount;
+      if (it.state === "due" && it.dueDate && it.dueDate <= in30) t.dueNext30 += gbp(it.amount);
     }
-    by.set(cur, t);
   }
-  // GBP first, then others.
-  return [...by.values()].sort((a, b) => (a.currency === "GBP" ? -1 : b.currency === "GBP" ? 1 : a.currency.localeCompare(b.currency)));
+  return t;
 }
 
 /** Overdue first (most overdue on top), then upcoming by next due date, then settled. */

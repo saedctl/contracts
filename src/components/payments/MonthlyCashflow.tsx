@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { addMonths, cashEvents, collectOptions, mainCurrency, monthKey, monthName, monthlySeries, resolveCollect, summarise, summariseRange, type CashEvent } from "@/lib/cashflow";
+import { addMonths, cashEvents, collectOptions, conversionNote, monthKey, monthName, monthlySeries, resolveCollect, summarise, summariseRange, type CashEvent } from "@/lib/cashflow";
 import type { Contract } from "@/lib/types";
 import { formatMoney, formatShortDate } from "@/lib/utils";
 import { Card, cx } from "@/components/ui";
 import { CashflowChart } from "./CashflowChart";
 import { MarkCollectedButton } from "./MarkCollectedButton";
 import { CollectSelect } from "./CollectSelect";
+import { FxNote } from "./PaymentSummary";
+import { REPORTING_CURRENCY, type FxRates } from "@/lib/fx";
 
 function EventList({ title, empty, events, due, canUndo }: { title: string; empty: string; events: CashEvent[]; due?: boolean; canUndo: boolean }) {
   return (
@@ -26,9 +28,16 @@ function EventList({ title, empty, events, due, canUndo }: { title: string; empt
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <span className="font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>
+                <span className="text-right">
+                  <span className="block font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>
+                  {e.original && (
+                    <span className="block text-[12px] tabular-nums text-muted" title={`1 ${e.original.currency} = ${e.original.rate} GBP on ${formatShortDate(e.original.rateDate)}`}>
+                      {formatMoney(e.original.amount, e.original.currency)} at {e.original.rate.toFixed(4)}
+                    </span>
+                  )}
+                </span>
                 {due && e.instalmentId && (
-                  <MarkCollectedButton id={e.contractId} instalmentId={e.instalmentId} amount={formatMoney(e.amount, e.currency)} collected={false} canUndo={canUndo} compact />
+                  <MarkCollectedButton id={e.contractId} instalmentId={e.instalmentId} amount={formatMoney(e.original?.amount ?? e.amount, e.original?.currency ?? e.currency)} collected={false} canUndo={canUndo} compact />
                 )}
               </div>
             </li>
@@ -40,8 +49,8 @@ function EventList({ title, empty, events, due, canUndo }: { title: string; empt
 }
 
 /** "This month vs next month" view of cash, with the contracts behind each number. */
-export function MonthlyCashflow({ contracts, today, isAdmin, headerRight, collect }: { contracts: Contract[]; today: string; isAdmin: boolean; headerRight?: ReactNode; collect?: string }) {
-  const events = cashEvents(contracts, today);
+export function MonthlyCashflow({ contracts, rates, today, isAdmin, headerRight, collect }: { contracts: Contract[]; rates: FxRates; today: string; isAdmin: boolean; headerRight?: ReactNode; collect?: string }) {
+  const events = cashEvents(contracts, today, rates);
   if (events.length === 0) {
     return (
       <section className="space-y-4" aria-labelledby="monthly-cash">
@@ -53,7 +62,8 @@ export function MonthlyCashflow({ contracts, today, isAdmin, headerRight, collec
       </section>
     );
   }
-  const currency = mainCurrency(events);
+  const currency = REPORTING_CURRENCY;
+  const fxNote = conversionNote(contracts, rates);
   const thisMonth = monthKey(today);
   const lastMonth = addMonths(thisMonth, -1);
 
@@ -68,7 +78,6 @@ export function MonthlyCashflow({ contracts, today, isAdmin, headerRight, collec
       ? monthName(period.from)
       : `${monthName(period.from).split(" ")[0]} – ${monthName(dueNext.keys[dueNext.keys.length - 1])}`;
   const delta = collected.total - collectedLast.total;
-  const otherCurrencies = [...new Set(events.map((e) => e.currency))].filter((c) => c !== currency);
   const money = (n: number) => formatMoney(n, currency);
   const members = (s: { events: CashEvent[] }) => new Set(s.events.map((e) => e.contractId)).size;
 
@@ -81,7 +90,6 @@ export function MonthlyCashflow({ contracts, today, isAdmin, headerRight, collec
         </div>
         <div className="flex flex-col items-end gap-1">
           {headerRight}
-          {otherCurrencies.length > 0 && <p className="text-[12.5px] text-muted">Showing {currency}. {otherCurrencies.join(", ")} payments are in the table below.</p>}
         </div>
       </div>
 
@@ -119,6 +127,8 @@ export function MonthlyCashflow({ contracts, today, isAdmin, headerRight, collec
           )}
         </Card>
       </div>
+
+      <FxNote converted={fxNote.converted} pending={fxNote.pending} />
 
       <Card className="p-5 sm:p-6">
         <CashflowChart buckets={monthlySeries(events, today, currency, 6, 3)} currency={currency} />

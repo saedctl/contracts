@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/auth/session";
 import { listContractsForStaff } from "@/lib/services/contracts";
 import { PAYMENT_STATE_LABELS, paymentRow, paymentTotals, sortPaymentRows, type PaymentRow, type PaymentState } from "@/lib/payments";
 import { formatMoney, formatShortDate, todayISO } from "@/lib/utils";
+import { fxOf, toReporting, type FxRates } from "@/lib/fx";
+import { fxRatesFor } from "@/lib/services/fx";
+import type { Contract } from "@/lib/types";
 import { Card, cx } from "@/components/ui";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
@@ -28,6 +31,14 @@ const STATE_STYLES: Record<PaymentState, string> = {
   paid_in_full: "bg-emerald-50 text-emerald-800 ring-emerald-200",
 };
 
+/** For a USD contract: "≈ £3,940" under the amount, using the rate remembered at signing. */
+function InGbp({ amount, c, rates }: { amount: number; c: Contract; rates: FxRates }) {
+  const fx = fxOf(c, rates);
+  if (c.currency === "GBP") return null;
+  if (!fx) return <div className="text-[12.5px] text-amber-800">GBP rate pending</div>;
+  return <div className="text-[12.5px] tabular-nums text-muted" title={`1 ${fx.from} = ${fx.rate} GBP (${formatShortDate(fx.rateDate)})`}>≈ {formatMoney(toReporting(amount, c, rates)!, "GBP")}</div>;
+}
+
 function StateBadge({ row }: { row: PaymentRow }) {
   const label = row.state === "overdue" ? `Overdue · ${row.daysOverdue} day${row.daysOverdue === 1 ? "" : "s"}` : PAYMENT_STATE_LABELS[row.state];
   return (
@@ -49,7 +60,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
   const signed = await listContractsForStaff(user, { status: "signed", q: q || undefined });
   const rows = sortPaymentRows(signed.filter((c) => !c.anonymisedAt).map((c) => paymentRow(c, today)));
-  const totals = paymentTotals(rows, today);
+  const monthContracts = period === "month" && q ? await listContractsForStaff(user, { status: "signed" }) : signed;
+  const rates = await fxRatesFor(monthContracts === signed ? signed : [...signed, ...monthContracts]);
+  const totals = paymentTotals(rows, today, rates);
   const shown = rows.filter((r) =>
     view === "all" ? true
     : view === "overdue" ? r.state === "overdue"
@@ -75,7 +88,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
       {period === "month" ? (
         <MonthlyCashflow
-          contracts={q ? await listContractsForStaff(user, { status: "signed" }) : signed}
+          contracts={monthContracts}
+          rates={rates}
           today={today}
           isAdmin={isAdmin}
           headerRight={<PeriodSelect value="month" />}
@@ -151,6 +165,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                       </td>
                       <td className="px-5 py-4 tabular-nums">
                         <div className="font-medium">{formatMoney(r.totalCollected, c.currency)}</div>
+                        <InGbp amount={r.totalCollected} c={c} rates={rates} />
                         <div className="text-[13px] text-muted">{formatMoney(r.collectedAtSigning, c.currency)} on {formatShortDate(r.collectedOn)}</div>
                         {r.paidCount > 0 && r.lastCollectedOn && (
                           <div className="text-[13px] text-muted">+ {r.plan.length > 1 ? `${r.paidCount} instalment${r.paidCount === 1 ? "" : "s"}` : "balance"}, last {formatShortDate(r.lastCollectedOn)}</div>
@@ -160,6 +175,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                         {r.outstanding > 0 ? (
                           <>
                             <div className="font-medium">{formatMoney(r.outstanding, c.currency)}</div>
+                            <InGbp amount={r.outstanding} c={c} rates={rates} />
                             {r.plan.length > 1 && <div className="text-[13px] text-muted">{r.paidCount} of {r.plan.length} instalments paid</div>}
                           </>
                         ) : <span className="text-muted">—</span>}
@@ -197,7 +213,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                       <StateBadge row={r} />
                     </div>
                     <dl className="grid grid-cols-2 gap-2 text-[13.5px]">
-                      <div><dt className="text-muted">Collected</dt><dd className="font-medium tabular-nums">{formatMoney(r.totalCollected, c.currency)}</dd></div>
+                      <div><dt className="text-muted">Collected</dt><dd className="font-medium tabular-nums">{formatMoney(r.totalCollected, c.currency)}<InGbp amount={r.totalCollected} c={c} rates={rates} /></dd></div>
                       <div><dt className="text-muted">To collect</dt><dd className="font-medium tabular-nums">{r.outstanding > 0 ? formatMoney(r.outstanding, c.currency) : "—"}</dd></div>
                       {r.next && <div className="col-span-2"><dt className="text-muted">Next due</dt><dd className="tabular-nums">{formatMoney(r.next.amount, c.currency)}{r.next.dueDate ? ` on ${formatShortDate(r.next.dueDate)}` : ""}{r.plan.length > 1 ? ` · ${r.paidCount} of ${r.plan.length} paid` : ""}</dd></div>}
                     </dl>
