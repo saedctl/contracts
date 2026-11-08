@@ -109,3 +109,31 @@ export function summarise(events: CashEvent[], key: string, states: CashEvent["s
     .sort((a, b) => a.date.localeCompare(b.date));
   return { key, total: list.reduce((s, e) => s + e.amount, 0), count: list.length, events: list };
 }
+
+/** Money due (not yet collected) across `months` consecutive months starting at `fromKey`. */
+export function summariseRange(events: CashEvent[], fromKey: string, months: number, currency: Currency) {
+  const keys = Array.from({ length: months }, (_, i) => addMonths(fromKey, i));
+  const perMonth = keys.map((k) => summarise(events, k, ["due"], currency));
+  const list = perMonth.flatMap((m) => m.events);
+  return { keys, perMonth, total: list.reduce((t, e) => t + e.amount, 0), count: list.length, events: list };
+}
+
+/**
+ * Options for the "To collect" period: each of the next six months, or a rolling 3/6 months.
+ * The value is what goes in the URL (?collect=).
+ */
+export function collectOptions(today: string) {
+  const current = monthKey(today);
+  const single = Array.from({ length: 6 }, (_, i) => ({ value: String(i + 1), label: monthName(addMonths(current, i + 1)) }));
+  return [...single, { value: "next3", label: "Next 3 months" }, { value: "next6", label: "Next 6 months" }];
+}
+
+/** Resolves ?collect= to a start month and length. Defaults to next month. */
+export function resolveCollect(value: string | undefined, today: string): { value: string; from: string; months: number } {
+  const current = monthKey(today);
+  if (value === "next3") return { value, from: addMonths(current, 1), months: 3 };
+  if (value === "next6") return { value, from: addMonths(current, 1), months: 6 };
+  const n = Number(value);
+  const ahead = Number.isInteger(n) && n >= 1 && n <= 6 ? n : 1;
+  return { value: String(ahead), from: addMonths(current, ahead), months: 1 };
+}
