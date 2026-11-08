@@ -79,6 +79,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           today={today}
           isAdmin={isAdmin}
           headerRight={<PeriodSelect value="month" />}
+          collect={sp.collect}
         />
       ) : (
         <section className="space-y-4" aria-labelledby="all-time-cash">
