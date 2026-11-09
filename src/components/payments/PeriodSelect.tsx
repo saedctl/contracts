@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-/** "Show: Monthly / All time" switch for the Payments summary. Monthly is the default. */
+/** "Show: Monthly / All time" switch for the cash summary on the Contracts dashboard. Monthly is the default. */
 export function PeriodSelect({ value }: { value: "month" | "all" }) {
   const router = useRouter();
   const pathname = usePathname();
