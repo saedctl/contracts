@@ -6,9 +6,11 @@ import { productionBlockers } from "@/lib/config";
 import { findUnfilled } from "@/lib/template";
 import { pickTemplate, tierLabel } from "@/lib/services/templates";
 import { MEMBERSHIP_TIERS } from "@/lib/types";
-import { paymentRow, paymentTotals } from "@/lib/payments";
 import { todayISO } from "@/lib/utils";
+import { DashboardMonthlyCash } from "@/components/payments/DashboardMonthlyCash";
 import { PaymentSummary } from "@/components/payments/PaymentSummary";
+import { PeriodSelect } from "@/components/payments/PeriodSelect";
+import { paymentRow, paymentTotals } from "@/lib/payments";
 import { fxRatesFor } from "@/lib/services/fx";
 import { getStore } from "@/lib/db";
 import { CONTRACT_STATUSES, type ContractStatus } from "@/lib/types";
@@ -21,6 +23,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const sp = await searchParams;
   const q = (sp.q ?? "").slice(0, 100);
+  // Cash summary: this month by default, or all-time totals.
+  const period: "month" | "all" = sp.period === "all" ? "all" : "month";
   const status = CONTRACT_STATUSES.includes(sp.status as ContractStatus) ? (sp.status as ContractStatus) : undefined;
 
   const [all, activeTemplates] = await Promise.all([
@@ -77,10 +81,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       })()}
 
       {!q && !status && (
-        <PaymentSummary
-          totals={paymentTotals(signedAll.map((c) => paymentRow(c, todayISO())), todayISO(), rates)}
-          link
-        />
+        period === "month" ? (
+          <DashboardMonthlyCash contracts={signedAll} rates={rates} today={todayISO()} headerRight={<PeriodSelect value="month" />} />
+        ) : (
+          <section className="space-y-3" aria-labelledby="dash-all-time-cash">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 id="dash-all-time-cash" className="font-serif text-[20px] font-semibold">All-time cash</h2>
+              <PeriodSelect value="all" />
+            </div>
+            <PaymentSummary totals={paymentTotals(signedAll.map((c) => paymentRow(c, todayISO())), todayISO(), rates)} link />
+          </section>
+        )
       )}
 
       <Card className="overflow-hidden">

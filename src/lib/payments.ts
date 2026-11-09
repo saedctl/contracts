@@ -157,3 +157,18 @@ export function sortPaymentRows(rows: PaymentRow[]): PaymentRow[] {
     b.collectedOn.localeCompare(a.collectedOn),
   );
 }
+
+export const PAYMENT_VIEWS = ["outstanding", "overdue", "settled", "all"] as const;
+export type PaymentView = (typeof PAYMENT_VIEWS)[number];
+
+export function parsePaymentView(v: string | undefined | null): PaymentView {
+  return PAYMENT_VIEWS.includes(v as PaymentView) ? (v as PaymentView) : "outstanding";
+}
+
+/** The rows a Payments filter shows (shared by the page and the CSV export). */
+export function inPaymentView(r: PaymentRow, view: PaymentView): boolean {
+  return view === "all" ? true
+    : view === "overdue" ? r.state === "overdue"
+    : view === "settled" ? r.state === "collected" || r.state === "paid_in_full"
+    : r.outstanding > 0;
+}
