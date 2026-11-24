@@ -15,6 +15,9 @@ import { AdminDeleteContract } from "@/components/contracts/AdminDeleteContract"
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
 import { INSTALMENT_STATE_LABELS, PAYMENT_STATE_LABELS, paymentRow } from "@/lib/payments";
 import { todayISO } from "@/lib/utils";
+import { calendarLinks, hasUpcomingPayments, memberCalendarToken, staffCalendarToken } from "@/lib/services/calendar";
+import { AddToCalendar } from "@/components/AddToCalendar";
+import { CopyButton } from "@/components/CopyButton";
 
 export const metadata: Metadata = { title: "Contract" };
 
@@ -26,6 +29,9 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   if (!found) notFound();
   // If Dropbox Sign's webhook was missed, opening the contract picks up the latest status.
   const c = await autoSyncIfAwaiting(found);
+  const calendar = c.status === "signed" && !c.anonymisedAt && hasUpcomingPayments(c)
+    ? { staff: calendarLinks(await staffCalendarToken(user), "The Engineers Club payments"), member: calendarLinks(memberCalendarToken(c), "The Engineers Club payments").page }
+    : null;
   const store = await getStore();
   const [events, emails, doc] = await Promise.all([
     store.listAuditEvents({ contractId: c.id, limit: 100 }),
@@ -140,6 +146,13 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {calendar && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+                    <span className="mr-1 text-[13px] text-muted">Payment dates:</span>
+                    <AddToCalendar links={calendar.staff} label="Add to my calendar" align="left" />
+                    <CopyButton value={calendar.member} label="Copy member's calendar link" />
                   </div>
                 )}
               </Card>
