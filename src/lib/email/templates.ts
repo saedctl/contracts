@@ -63,26 +63,39 @@ export function signatureRequestEmail(opts: { customerName: string; url: string;
   };
 }
 
-export function signatureConfirmationEmail(opts: { customerName: string; demo: boolean }) {
+export function signatureConfirmationEmail(opts: { customerName: string; demo: boolean; calendar?: { url: string; schedule: string[] } }) {
   const subject = "Your Signed Membership Agreement";
   const paragraphs = [
     `Hi ${opts.customerName},`,
     "Thank you for signing your membership agreement.",
     "Attached is a copy of your completed contract for your records.",
+    ...(opts.calendar
+      ? ["Your payment dates:", ...opts.calendar.schedule.map((l) => `• ${l}`), "Add them to your calendar with one tap: you'll get reminders 7 days and 24 hours before each payment, and on the day."]
+      : []),
+  ];
+  const after = [
+    ...(opts.calendar ? ["The dates are also attached as a calendar file (payment-dates.ics) — open it to add them."] : []),
     "We're looking forward to having you in The Engineers Club!",
   ];
   return {
     subject,
-    html: layout({ preheader: "Your completed membership agreement is attached.", paragraphs, demo: opts.demo }),
-    text: [...paragraphs, "", "Best regards,", "The Engineers Club Team"].join("\n"),
+    html: layout({
+      preheader: "Your completed membership agreement is attached.",
+      paragraphs,
+      button: opts.calendar ? { label: "Add payment dates to calendar", url: opts.calendar.url } : undefined,
+      afterButton: after,
+      demo: opts.demo,
+    }),
+    text: [...paragraphs, ...(opts.calendar ? ["", `Add to calendar: ${opts.calendar.url}`] : []), "", ...after, "", "Best regards,", "The Engineers Club Team"].join("\n"),
   };
 }
 
-export function businessCopyEmail(opts: { customerName: string; customerEmail: string; reference: string; dashboardUrl: string; demo: boolean }) {
+export function businessCopyEmail(opts: { customerName: string; customerEmail: string; reference: string; dashboardUrl: string; demo: boolean; hasCalendar?: boolean }) {
   const subject = `Signed: ${opts.customerName} — ${opts.reference}`;
   const paragraphs = [
     `${opts.customerName} (${opts.customerEmail}) has signed membership agreement ${opts.reference}.`,
     "The completed agreement, including the e-signature provider's audit trail, is attached.",
+    ...(opts.hasCalendar ? ["Their payment dates are attached as a calendar file (payment-dates.ics), with reminders 7 days and 24 hours before each one."] : []),
   ];
   return {
     subject,

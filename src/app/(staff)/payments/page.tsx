@@ -6,6 +6,8 @@ import { PAYMENT_STATE_LABELS, inPaymentView, parsePaymentView, paymentRow, sort
 import { formatMoney, formatShortDate, todayISO } from "@/lib/utils";
 import { fxOf, toReporting, type FxRates } from "@/lib/fx";
 import { fxRatesFor } from "@/lib/services/fx";
+import { calendarLinks, staffCalendarToken } from "@/lib/services/calendar";
+import { AddToCalendar } from "@/components/AddToCalendar";
 import type { Contract } from "@/lib/types";
 import { Card, cx } from "@/components/ui";
 import { MarkCollectedButton } from "@/components/payments/MarkCollectedButton";
@@ -67,6 +69,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   };
   const href = (v: View) => `/payments?view=${v}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const isAdmin = user.role === "admin";
+  const calendar = calendarLinks(await staffCalendarToken(user), "The Engineers Club payments");
 
   return (
     <div className="space-y-8">
@@ -83,6 +86,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         isAdmin={isAdmin}
         collect={sp.collect}
         headerRight={
+          <div className="flex flex-wrap items-center gap-2">
+          <AddToCalendar links={calendar} label="Add to my calendar" resettable />
           <a
             href={`/api/payments/export?view=${view}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
             className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3.5 py-1.5 text-[13.5px] font-medium text-ink transition hover:border-line-strong"
@@ -91,6 +96,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M8 2v8m0 0-3-3m3 3 3-3M3 13h10" strokeLinecap="round" strokeLinejoin="round" /></svg>
             Export CSV
           </a>
+          </div>
         }
       />
 

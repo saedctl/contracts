@@ -8,7 +8,7 @@ import * as ds from "../esign/dropbox-sign";
 import { sendEmail } from "../email/send";
 import { businessCopyEmail, signatureConfirmationEmail, signatureRequestEmail } from "../email/templates";
 import { MEMBERSHIP_TIER_LABELS, type Contract, type ContractStatus, type MembershipTier, type StaffUser, type TemplateVersion } from "../types";
-import { formatLongDate, randomToken, sha256Hex } from "../utils";
+import { formatLongDate, formatMoney, randomToken, sha256Hex } from "../utils";
 import type { ContractInput } from "../validation";
 import type { RequestMeta } from "../request";
 import { buildFieldValues } from "./fields";
@@ -16,6 +16,8 @@ import { buildDoc, companySignatureFields, getCompanySignatureSetting } from "./
 import { templateForTier } from "./templates";
 import { audit } from "./audit";
 import { fxRatesFor } from "./fx";
+import { calendarLinks, contractIcs, hasUpcomingPayments, memberCalendarToken } from "./calendar";
+import { planOf } from "../payments";
 import { rateLimit } from "../rate-limit";
 
 import { UserFacingError } from "../errors";
@@ -598,13 +600,24 @@ async function sendConfirmations(contractId: string) {
   if (!pdf) throw new Error("Signed document missing from storage");
   const filename = `${c.reference} Signed Membership Agreement${c.isDemo ? " (DEMO)" : ""}.pdf`;
 
-  const customer = signatureConfirmationEmail({ customerName: c.customerName, demo: c.isDemo });
-  const r1 = await sendEmail({ ...customer, to: c.customerEmail, attachments: [{ filename, content: pdf }], kind: "signature_confirmation", contractId: c.id, idempotencyKey: `confirm:${c.id}` });
+  // Payment dates: a one-tap "add to calendar" link plus the dates as an attached .ics file.
+  const withCalendar = hasUpcomingPayments(c);
+  const plan = planOf(c, new Date().toISOString().slice(0, 10)).filter((it) => it.dueDate);
+  const calendar = withCalendar
+    ? {
+        url: calendarLinks(memberCalendarToken(c), "The Engineers Club payments").page,
+        schedule: plan.map((it) => `${formatLongDate(it.dueDate!)}: ${formatMoney(it.amount, c.currency)}${it.collectedAt ? " (paid)" : ""}`),
+      }
+    : undefined;
+  const ics = (audience: "member" | "staff") => ({ filename: "payment-dates.ics", content: new TextEncoder().encode(contractIcs(c, audience)) });
+
+  const customer = signatureConfirmationEmail({ customerName: c.customerName, demo: c.isDemo, calendar });
+  const r1 = await sendEmail({ ...customer, to: c.customerEmail, attachments: [{ filename, content: pdf }, ...(withCalendar ? [ics("member")] : [])], kind: "signature_confirmation", contractId: c.id, idempotencyKey: `confirm:${c.id}` });
 
   const businessTo = config.businessEmail;
   if (businessTo) {
-    const biz = businessCopyEmail({ customerName: c.customerName, customerEmail: c.customerEmail, reference: c.reference, dashboardUrl: `${config.appUrl}/contracts/${c.id}`, demo: c.isDemo });
-    await sendEmail({ ...biz, to: businessTo, attachments: [{ filename, content: pdf }], kind: "business_copy", contractId: c.id, idempotencyKey: `bizcopy:${c.id}` });
+    const biz = businessCopyEmail({ customerName: c.customerName, customerEmail: c.customerEmail, reference: c.reference, dashboardUrl: `${config.appUrl}/contracts/${c.id}`, demo: c.isDemo, hasCalendar: withCalendar });
+    await sendEmail({ ...biz, to: businessTo, attachments: [{ filename, content: pdf }, ...(withCalendar ? [ics("staff")] : [])], kind: "business_copy", contractId: c.id, idempotencyKey: `bizcopy:${c.id}` });
   }
   await store.updateContract(c.id, { confirmationSentAt: new Date().toISOString() });
   await audit(c.id, { type: "system" }, "contract.confirmation_sent", { to: [c.customerEmail, businessTo].filter(Boolean), simulated: r1.simulated });
